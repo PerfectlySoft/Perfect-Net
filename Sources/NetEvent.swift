@@ -141,7 +141,7 @@ class NetEvent {
 
 	private func runLoop() {
 
-		let q = Threading.getQueue(name: "NetEvent", type: .Serial)
+		let q = Threading.getQueue(name: "NetEvent", type: .serial)
 		q.dispatch {
 			while true {
 
