@@ -48,7 +48,7 @@ func logTerminal(message: String) {
     exit(-1)
 }
 
-class NetEvent {
+public class NetEvent {
 
 	enum Filter {
 		case None, Error(Int32), Read, Write, Timer
@@ -132,7 +132,7 @@ class NetEvent {
 		memset(self.evlist, 0, sizeof(event.self) * self.numEvents)
 	}
 
-	static func initialize() {
+	public static func initialize() {
 		Threading.once(&NetEvent.initOnce) {
 			NetEvent.staticEvent = NetEvent()
 			NetEvent.staticEvent.runLoop()

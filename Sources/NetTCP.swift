@@ -53,6 +53,8 @@ public class NetTCP {
 	
 	var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
 	
+    public var isValid: Bool { return self.fd.isValid }
+    
 	/// Create a new object with an initially invalid socket file descriptor.
 	public init() {
 		

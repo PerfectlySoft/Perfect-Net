@@ -60,7 +60,7 @@ public struct SocketFileDescriptor {
 	}
 }
 
-extension UnsignedInteger {
+public extension UnsignedInteger {
     var hostIsLittleEndian: Bool { return 256.littleEndian == 256 }
 }
 
