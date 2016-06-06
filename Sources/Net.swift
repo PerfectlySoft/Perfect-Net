@@ -26,7 +26,7 @@ import Darwin
 
 public typealias SocketType = Int32
 
-let invalidSocket = SocketType(-1)
+public let invalidSocket = SocketType(-1)
 
 /// Combines a socket with its family type & provides some utilities required by the LibEvent sub-system.
 public struct SocketFileDescriptor {

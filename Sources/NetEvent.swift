@@ -108,7 +108,7 @@ public class NetEvent {
 
 	private static var initOnce = Threading.ThreadOnce()
 
-	static let noTimeout = Threading.noTimeout
+	public static let noTimeout = Threading.noTimeout
 
 	private init() {
 
