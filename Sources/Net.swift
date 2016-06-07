@@ -20,6 +20,11 @@
 #if os(Linux)
 import SwiftGlibc
 import LinuxBridge
+    
+var errno: Int32 {
+    return linux_errno()
+}
+    
 #else
 import Darwin
 #endif
