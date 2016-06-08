@@ -125,6 +125,11 @@ public class NetEvent {
 		sa.sa_flags = 0
 		sigaction(SIGPIPE, &sa, nil)
 
+        var rlmt = rlimit()
+        getrlimit(RLIMIT_NOFILE, &rlmt)
+        rlmt.rlim_cur = rlim_t(OPEN_MAX)
+        setrlimit(RLIMIT_NOFILE, &rlmt)
+        
 		guard self.kq != -1 else {
 			logTerminal(message: "Unable to initialize event listener.")
 		}
