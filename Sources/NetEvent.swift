@@ -51,14 +51,14 @@ func logTerminal(message: String) {
 public class NetEvent {
 
 	enum Filter {
-		case None, Error(Int32), Read, Write, Timer
+		case none, error(Int32), read, write, timer
 
 		#if os(Linux)
 		var epollEvent: UInt32 {
 			switch self {
-			case .Read:
+			case .read:
 				return EPOLLIN.rawValue
-			case .Write:
+			case .write:
 				return EPOLLOUT.rawValue
 			default:
 				return 0
@@ -67,9 +67,9 @@ public class NetEvent {
 		#else
 		var kqueueFilter: Int16 {
 			switch self {
-			case .Read:
+			case .read:
 				return Int16(EVFILT_READ)
-			case .Write:
+			case .write:
 				return Int16(EVFILT_WRITE)
 			default:
 				return 0
@@ -215,15 +215,15 @@ public class NetEvent {
 							print("event rcv \(sock) \(filter) \(evt.events)")
 						}
 					#else
-						var filter = Filter.None
+						var filter = Filter.none
 						if evt.filter == Int16(EVFILT_TIMER) {
-							filter = .Timer
+							filter = .timer
 						} else if evt.filter == Int16(EV_ERROR) {
-							filter = .Error(Int32(evt.data))
+							filter = .error(Int32(evt.data))
 						} else if evt.filter == Int16(EVFILT_READ) {
-							filter = .Read
+							filter = .read
 						} else if evt.filter == Int16(EVFILT_WRITE) {
-							filter = .Write
+							filter = .write
 						}
 						if NetEvent.debug {
 							print("event rcv \(sock) \(filter) \(evt.data)")
@@ -247,7 +247,7 @@ public class NetEvent {
 							// need to either remove the timer or the failed event
 							// this could be optimised to do all removes at once
 							var tmout = timespec(tv_sec: 0, tv_nsec: 0)
-							if case .Timer = filter {
+							if case .timer = filter {
 								if NetEvent.debug {
 									print("event del \(sock) \(qitm.what)")
 								}

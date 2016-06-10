@@ -280,10 +280,10 @@ public class NetTCP {
 	
 	func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
 		
-		NetEvent.add(socket: fd.fd, what: .Read, timeoutSeconds: timeoutSeconds) { [weak self]
+		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeoutSeconds) { [weak self]
 			fd, w in
 			
-			if case .Read = w {
+			if case .read = w {
 				self?.readBytesFully(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
 			} else {
 				completion(nil) // timeout or error
@@ -344,10 +344,10 @@ public class NetTCP {
 		var totalSent = 0
 		let ptr = UnsafeMutablePointer<UInt8>(byts)
 		var s: Threading.Event?
-		var what: NetEvent.Filter = .None
+		var what: NetEvent.Filter = .none
 		
 		let waitFunc = {
-			NetEvent.add(socket: self.fd.fd, what: .Write, timeoutSeconds: NetEvent.noTimeout) {
+			NetEvent.add(socket: self.fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 				_, w in
 				what = w
 				let _ = s?.lock()
@@ -386,7 +386,7 @@ public class NetTCP {
 			
 			let _ = s!.wait()
 			let _ = s!.unlock()
-			if case .Write = what {
+			if case .write = what {
 			
 			} else {
 				break
@@ -422,7 +422,7 @@ public class NetTCP {
 	
 	func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
 		
-		NetEvent.add(socket: fd.fd, what: .Write, timeoutSeconds: NetEvent.noTimeout) {
+		NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 			fd, w in
 			
 			self.write(bytes: nptr, wrote: wrote, length: length, completion: completion)
@@ -463,9 +463,9 @@ public class NetTCP {
 			guard errno == EINPROGRESS else {
 				try ThrowNetworkError()
 			}
-			NetEvent.add(socket: fd.fd, what: .Write, timeoutSeconds: timeoutSeconds) {
+			NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: timeoutSeconds) {
 				fd, w in
-				if case .Timer = w {
+				if case .timer = w {
 					callBack(nil)
 				} else {
 					callBack(self)
@@ -492,10 +492,10 @@ public class NetTCP {
 				try ThrowNetworkError()
 			}
 			
-			NetEvent.add(socket: fd.fd, what: .Read, timeoutSeconds: timeout) {
+			NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) {
 				fd, w in
 			
-				if case .Timer = w {
+				if case .timer = w {
 					callBack(nil)
 				} else {
 					do {
@@ -520,7 +520,7 @@ public class NetTCP {
 	
 	private func waitAccept() {
 		
-		NetEvent.add(socket: fd.fd, what: .Read, timeoutSeconds: NetEvent.noTimeout) { [weak self]
+		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: NetEvent.noTimeout) { [weak self]
 			_, _ in
 			
 			let _ = self?.semaphore!.lock()

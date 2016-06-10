@@ -88,12 +88,12 @@ extension UInt64: BytesSwappingUnsignedInteger {}
 
 public enum PerfectNetError : ErrorProtocol {
     /// A network related error code and message.
-    case NetworkError(Int32, String)
+    case networkError(Int32, String)
 }
 
 @noreturn
 func ThrowNetworkError(file: String = #file, function: String = #function, line: Int = #line) throws {
     let err = errno
     let msg = String(validatingUTF8: strerror(err))!
-    throw PerfectNetError.NetworkError(err, msg + " \(file) \(function) \(line)")
+    throw PerfectNetError.networkError(err, msg + " \(file) \(function) \(line)")
 }

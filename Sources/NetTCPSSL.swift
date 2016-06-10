@@ -303,16 +303,16 @@ public class NetTCPSSL : NetTCP {
 		guard usingSSL else {
 			return super.readBytesFullyIncomplete(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
 		}
-		var what = NetEvent.Filter.Write
+		var what = NetEvent.Filter.write
 		let sslErr = SSL_get_error(self.ssl!, -1)
 		if sslErr == SSL_ERROR_WANT_READ {
-			what = NetEvent.Filter.Read
+			what = NetEvent.Filter.read
 		}
 
 		NetEvent.add(socket: fd.fd, what: what, timeoutSeconds: NetEvent.noTimeout) {
 			fd, w in
 
-			if case .Timer = w {
+			if case .timer = w {
 				completion(nil) // timeout or error
 			} else {
 				self.readBytesFully(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
@@ -324,10 +324,10 @@ public class NetTCPSSL : NetTCP {
 		guard usingSSL else {
 			return super.writeIncomplete(bytes: nptr, wrote: wrote, length: length, completion: completion)
 		}
-		var what = NetEvent.Filter.Write
+		var what = NetEvent.Filter.write
 		let sslErr = SSL_get_error(self.ssl!, -1)
 		if sslErr == SSL_ERROR_WANT_READ {
-			what = NetEvent.Filter.Read
+			what = NetEvent.Filter.read
 		}
 
 		NetEvent.add(socket: fd.fd, what: what, timeoutSeconds: NetEvent.noTimeout) { [weak self]
@@ -380,10 +380,10 @@ public class NetTCPSSL : NetTCP {
 			let sslErr = SSL_get_error(ssl, res)
 			if sslErr == SSL_ERROR_WANT_WRITE {
 
-				NetEvent.add(socket: fd.fd, what: .Write, timeoutSeconds: timeout) { [weak self]
+				NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: timeout) { [weak self]
 					fd, w in
 
-					if case .Write = w {
+					if case .write = w {
 						self?.beginSSL(timeoutSeconds: timeout, closure: closure)
 					} else {
 						closure(false)
@@ -392,10 +392,10 @@ public class NetTCPSSL : NetTCP {
 				return
 			} else if sslErr == SSL_ERROR_WANT_READ {
 
-				NetEvent.add(socket: fd.fd, what: .Read, timeoutSeconds: timeout) { [weak self]
+				NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) { [weak self]
 					fd, w in
 
-					if case .Read = w {
+					if case .read = w {
 						self?.beginSSL(timeoutSeconds: timeout, closure: closure)
 					} else {
 						closure(false)
@@ -537,10 +537,10 @@ public class NetTCPSSL : NetTCP {
 		if res == -1 {
 			if sslErr == SSL_ERROR_WANT_WRITE {
 
-				NetEvent.add(socket: net.fd.fd, what: .Write, timeoutSeconds: timeout) { [weak self]
+				NetEvent.add(socket: net.fd.fd, what: .write, timeoutSeconds: timeout) { [weak self]
 					fd, w in
 
-					if case .Timer = w {
+					if case .timer = w {
 						callBack(nil)
 					} else {
 						self?.finishAccept(timeoutSeconds: timeout, net: net, callBack: callBack)
@@ -549,10 +549,10 @@ public class NetTCPSSL : NetTCP {
 
 			} else if sslErr == SSL_ERROR_WANT_READ {
 
-				NetEvent.add(socket: net.fd.fd, what: .Read, timeoutSeconds: timeout) { [weak self]
+				NetEvent.add(socket: net.fd.fd, what: .read, timeoutSeconds: timeout) { [weak self]
 					fd, w in
 
-					if case .Timer = w {
+					if case .timer = w {
 						callBack(nil)
 					} else {
 						self?.finishAccept(timeoutSeconds: timeout, net: net, callBack: callBack)

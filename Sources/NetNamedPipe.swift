@@ -188,10 +188,10 @@ public class NetNamedPipe : NetTCP {
 				try ThrowNetworkError()
 			}
 
-			NetEvent.add(socket: fd.fd, what: .Write, timeoutSeconds: timeoutSeconds) {
+			NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: timeoutSeconds) {
 				fd, w in
 
-				if case .Timer = w {
+				if case .timer = w {
 					callBack(nil)
 				} else {
 					callBack(self)
@@ -258,7 +258,7 @@ public class NetNamedPipe : NetTCP {
 			callBack(true)
 		} else if res == -1 && errno == EAGAIN {
 
-			NetEvent.add(socket: self.fd.fd, what: .Write, timeoutSeconds: NetEvent.noTimeout) { [weak self]
+			NetEvent.add(socket: self.fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) { [weak self]
 				fd, w in
 
 				do {
@@ -323,7 +323,7 @@ public class NetNamedPipe : NetTCP {
 			cb(receivedInt)
 		} else if res == -1 && errno == EAGAIN {
 
-			NetEvent.add(socket: self.fd.fd, what: .Read, timeoutSeconds: NetEvent.noTimeout) { [weak self]
+			NetEvent.add(socket: self.fd.fd, what: .read, timeoutSeconds: NetEvent.noTimeout) { [weak self]
 				fd, w in
 
 				do {
