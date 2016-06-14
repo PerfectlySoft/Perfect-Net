@@ -44,25 +44,47 @@ public struct SocketFileDescriptor {
 		self.family = family
 	}
 
-	func switchToNBIO() {
-		if self.fd != invalidSocket {
+	func switchToNonBlocking() {
+        guard self.fd != invalidSocket else {
+            return
+        }
+        
 #if os(Linux)
-			let flags = linux_fcntl_get(fd, F_GETFL)
-			guard flags >= 0 else {
-				return
-			}
-			let _ = linux_fcntl_set(fd, F_SETFL, flags | O_NONBLOCK)
+        let flags = linux_fcntl_get(fd, F_GETFL)
+        guard flags >= 0 else {
+            return
+        }
+        let _ = linux_fcntl_set(fd, F_SETFL, flags | O_NONBLOCK)
 #else
-			let flags = fcntl(fd, F_GETFL)
-			guard flags >= 0 else {
-				return
-			}
-			let _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0 else {
+            return
+        }
+        let _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 #endif
-			var one = Int32(1)
-			setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32)))
-		}
+        var one = Int32(1)
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32)))
 	}
+    
+    func switchToBlocking() {
+        guard self.fd != invalidSocket else {
+            return
+        }
+        
+    #if os(Linux)
+        let flags = linux_fcntl_get(fd, F_GETFL)
+        guard flags >= 0 else {
+            return
+        }
+        let _ = linux_fcntl_set(fd, F_SETFL, flags & ~O_NONBLOCK)
+    #else
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0 else {
+            return
+        }
+        let _ = fcntl(fd, F_SETFL, flags & ~O_NONBLOCK)
+    #endif
+    }
 }
 
 public extension UnsignedInteger {

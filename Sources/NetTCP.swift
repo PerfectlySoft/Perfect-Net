@@ -47,8 +47,6 @@ public class NetTCP {
 	}
 	
 	private var networkFailure: Bool = false
-	private var semaphore: Threading.Event?
-	
 	private let reasonableMaxReadCount = 1024 * 600 // <700k is imperically the largest chuck I was reading at a go
 	
 	var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
@@ -66,7 +64,7 @@ public class NetTCP {
 		self.init()
 		self.fd.fd = fd
 		self.fd.family = AF_INET
-		self.fd.switchToNBIO()
+		self.fd.switchToNonBlocking()
 	}
 	
 	/// Allocates a new socket if it has not already been done.
@@ -81,7 +79,7 @@ public class NetTCP {
 			fd.fd = socket(AF_INET, SOCK_STREAM, 0)
 		#endif
 			fd.family = AF_INET
-			fd.switchToNBIO()
+			fd.switchToNonBlocking()
 		}
 	}
 	
@@ -181,13 +179,7 @@ public class NetTCP {
 		#endif
 			
 			fd.fd = invalidSocket
-			
-			if self.semaphore != nil {
-                if self.semaphore!.lock() && self.semaphore!.signal() {
-                    let _ = self.semaphore!.unlock()
-                }
-			}
-		}
+        }
 	}
 	
 	func recv(into buf: UnsafeMutablePointer<Void>, count: Int) -> Int {
@@ -518,47 +510,22 @@ public class NetTCP {
 		return accRes
 	}
 	
-	private func waitAccept() {
-		
-		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: NetEvent.noTimeout) { [weak self]
-			_, _ in
-			
-			let _ = self?.semaphore!.lock()
-			let _ = self?.semaphore!.signal()
-			let _ = self?.semaphore!.unlock()
-		}
-	}
-	
 	/// Accept a series of new client connections and pass them to the callback. This function does not return outside of a catastrophic error.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
 	public func forEachAccept(callBack: (NetTCP?) -> ()) {
-		
-		guard self.semaphore == nil else {
-			return
-		}
-		
-		self.semaphore = Threading.Event()
-		defer { self.semaphore = nil }
-		
+		self.fd.switchToBlocking()
 		repeat {
-		
 			let accRes = tryAccept()
 			if accRes != -1 {
 				Threading.dispatch {
 					callBack(self.makeFromFd(accRes))
 				}
-			} else if self.isEAgain(err: Int(accRes)) {
-				let _ = self.semaphore!.lock()
-				waitAccept()
-				let _ = self.semaphore!.wait()
-				let _ = self.semaphore!.unlock()
 			} else {
 				let errStr = String(validatingUTF8: strerror(Int32(errno))) ?? "NO MESSAGE"
 				print("Unexpected networking error: \(errno) '\(errStr)'")
 				networkFailure = true
 			}
 		} while !networkFailure && self.fd.fd != invalidSocket
-		return
 	}
 	
 	func makeFromFd(_ fd: Int32) -> NetTCP {

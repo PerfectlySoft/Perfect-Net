@@ -34,7 +34,7 @@ public class NetNamedPipe : NetTCP {
 		self.init()
 		self.fd.fd = fd
 		self.fd.family = AF_UNIX
-		self.fd.switchToNBIO()
+		self.fd.switchToNonBlocking()
 	}
 
 	/// Override socket initialization to handle the UNIX socket type.
@@ -45,7 +45,7 @@ public class NetNamedPipe : NetTCP {
 		fd.fd = socket(AF_UNIX, SOCK_STREAM, 0)
 	#endif
 		fd.family = AF_UNIX
-		fd.switchToNBIO()
+		fd.switchToNonBlocking()
 	}
 
 	public override func sockName() -> (String, UInt16) {
