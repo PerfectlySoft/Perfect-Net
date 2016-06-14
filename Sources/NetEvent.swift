@@ -135,7 +135,7 @@ public class NetEvent {
         rlmt.rlim_cur = rlim_t(OPEN_MAX)
         setrlimit(RLIMIT_NOFILE, &rlmt)
     #endif
-        
+
 		guard self.kq != -1 else {
 			logTerminal(message: "Unable to initialize event listener.")
 		}
@@ -195,21 +195,21 @@ public class NetEvent {
 						let qitmIsTimeout = qitm.timeoutSeconds > NetEvent.noTimeout
 
 					#if os(Linux)
-						var filter = Filter.None
+						var filter = Filter.none
 						if (evt.events & EPOLLERR.rawValue) != 0 {
 							var errData = Int32(0)
 							var errLen = socklen_t(sizeof(Int32))
 							getsockopt(sock, SOL_SOCKET, SO_ERROR, &errData, &errLen)
-							filter = .Error(errData)
+							filter = .error(errData)
 						} else if (evt.events & EPOLLIN.rawValue) != 0 {
 							if qitmIsTimeout {
 								// this is a timeout
-								filter = .Timer
+								filter = .timer
 							} else {
-								filter = .Read
+								filter = .read
 							}
 						} else if (evt.events & EPOLLOUT.rawValue) != 0 {
-							filter = .Write
+							filter = .write
 						}
 						if NetEvent.debug {
 							print("event rcv \(sock) \(filter) \(evt.events)")
@@ -296,10 +296,10 @@ public class NetEvent {
 						timerfd_settime(associated, 0, &timerspec, nil)
 
 						var evt = event()
-						evt.events = Filter.Read.epollEvent | EPOLLONESHOT.rawValue | EPOLLET.rawValue
+						evt.events = Filter.read.epollEvent | EPOLLONESHOT.rawValue | EPOLLET.rawValue
 						evt.data.fd = associated
 
-						n.queuedSockets[associated] = QueuedSocket(socket: associated, what: .Read, timeoutSeconds: timeoutSeconds, callback: threadingCallback, associated: newSocket)
+						n.queuedSockets[associated] = QueuedSocket(socket: associated, what: .read, timeoutSeconds: timeoutSeconds, callback: threadingCallback, associated: newSocket)
 						epoll_ctl(n.kq, EPOLL_CTL_ADD, associated, &evt)
 						if NetEvent.debug {
 							print("event add \(associated) TIMER for \(newSocket)")
