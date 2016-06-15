@@ -79,7 +79,12 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
-	static var dispatchOnce = Threading.ThreadOnce()
+    static var initOnce: Bool = {
+        SSL_library_init()
+        ERR_load_crypto_strings()
+        SSL_load_error_strings()
+        return true
+    }()
 
 	private var sharedSSLCtx = true
 	private var sslCtx: UnsafeMutablePointer<SSL_CTX>?
@@ -90,19 +95,15 @@ public class NetTCPSSL : NetTCP {
 			if !self.keyFilePassword.isEmpty {
 
 				self.initSocket()
-                let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
+                let opaqueMe = UnsafeMutablePointer<Void>(OpaquePointer(bitPattern: Unmanaged.passUnretained(self)))
 				let callback: passwordCallbackFunc = {
-
 					(buf, size, rwflag, userData) -> Int32 in
-				#if swift(>=3.0)
+				
 					guard let userDataCheck = userData, bufCheck = buf else {
 						return 0
 					}
-				#else
-					let userDataCheck = userData, bufCheck = buf
-				#endif
 
-					let crl = Unmanaged<NetTCPSSL>.fromOpaque(userDataCheck).takeUnretainedValue()
+					let crl = Unmanaged<NetTCPSSL>.fromOpaque(OpaquePointer(userDataCheck)).takeUnretainedValue()
 					return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
 				}
 
@@ -116,13 +117,9 @@ public class NetTCPSSL : NetTCP {
 		guard let ssl = self.ssl else {
 			return nil
 		}
-	#if swift(>=3.0)
 		guard let cert = SSL_get_peer_certificate(ssl) else {
 			return nil
 		}
-	#else
-		let cert = SSL_get_peer_certificate(ssl)
-	#endif
 		return X509(ptr: cert)
 	}
 
@@ -190,11 +187,7 @@ public class NetTCPSSL : NetTCP {
 	public override init() {
 		super.init()
 
-		Threading.once(&NetTCPSSL.dispatchOnce) {
-			SSL_library_init()
-			ERR_load_crypto_strings()
-			SSL_load_error_strings()
-		}
+		_ = NetTCPSSL.initOnce
 	}
 
 	deinit {

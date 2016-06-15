@@ -106,7 +106,11 @@ public class NetEvent {
 	private var numEvents = 64
 	private var evlist: UnsafeMutablePointer<event>
 
-	private static var initOnce = Threading.ThreadOnce()
+    private static var initOnce: Bool = {
+        NetEvent.staticEvent = NetEvent()
+        NetEvent.staticEvent.runLoop()
+        return true
+    }()
 
 	public static let noTimeout = Threading.noTimeout
 
@@ -144,10 +148,7 @@ public class NetEvent {
 	}
 
 	public static func initialize() {
-		Threading.once(&NetEvent.initOnce) {
-			NetEvent.staticEvent = NetEvent()
-			NetEvent.staticEvent.runLoop()
-		}
+		_ = NetEvent.initOnce
 	}
 
 	private func runLoop() {
