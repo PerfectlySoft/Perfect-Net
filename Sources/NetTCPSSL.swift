@@ -95,15 +95,23 @@ public class NetTCPSSL : NetTCP {
 			if !self.keyFilePassword.isEmpty {
 
 				self.initSocket()
+            #if FLIP
                 let opaqueMe = UnsafeMutablePointer<Void>(OpaquePointer(bitPattern: Unmanaged.passUnretained(self)))
+            #else
+                let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
+            #endif
 				let callback: passwordCallbackFunc = {
 					(buf, size, rwflag, userData) -> Int32 in
 				
 					guard let userDataCheck = userData, bufCheck = buf else {
 						return 0
 					}
-
-					let crl = Unmanaged<NetTCPSSL>.fromOpaque(OpaquePointer(userDataCheck)).takeUnretainedValue()
+                    
+                #if FLIP
+                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(OpaquePointer(userDataCheck)).takeUnretainedValue()
+                #else
+                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutablePointer<()>(userDataCheck)).takeUnretainedValue()
+                #endif
 					return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
 				}
 
