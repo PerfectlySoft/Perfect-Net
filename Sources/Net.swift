@@ -63,7 +63,7 @@ public struct SocketFileDescriptor {
         let _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 #endif
         var one = Int32(1)
-        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32)))
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32.self)))
 	}
     
     func switchToBlocking() {

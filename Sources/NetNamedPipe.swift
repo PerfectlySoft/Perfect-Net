@@ -55,7 +55,7 @@ public class NetNamedPipe : NetTCP {
 			addr.deallocateCapacity(1)
 			len.deallocateCapacity(1)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in))
+		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 
 		var nameBuf = [CChar]()
@@ -86,7 +86,7 @@ public class NetNamedPipe : NetTCP {
 			addr.deallocateCapacity(1)
 			len.deallocateCapacity(1)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in))
+		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 
 		var nameBuf = [CChar]()
@@ -113,9 +113,9 @@ public class NetNamedPipe : NetTCP {
 	private func makeUNAddr(address addr: String) -> (UnsafeMutablePointer<UInt8>, Int) {
 		let utf8 = addr.utf8
 #if os(Linux) // BSDs have a size identifier in front, Linux does not
-		let addrLen = sizeof(sockaddr_un)
+		let addrLen = sizeof(sockaddr_un.self)
 #else
-		let addrLen = sizeof(UInt8) + sizeof(sa_family_t) + utf8.count + 1
+		let addrLen = sizeof(UInt8.self) + sizeof(sa_family_t.self) + utf8.count + 1
 #endif
 		let addrPtr = UnsafeMutablePointer<UInt8>(allocatingCapacity: addrLen)
 
@@ -205,7 +205,7 @@ public class NetNamedPipe : NetTCP {
 	/// - parameter callBack: The callback to call when the send completes. The parameter passed will be `true` if the send completed without error.
 	/// - throws: `PerfectError.NetworkError`
 	public func sendFd(_ fd: Int32, callBack: (Bool) -> ()) throws {
-		let length = sizeof(cmsghdr) + sizeof(Int32)
+		let length = sizeof(cmsghdr.self) + sizeof(Int32.self)
 	#if os(Linux)
 		var msghdr = UnsafeMutablePointer<SwiftGlibc.msghdr>(allocatingCapacity: 1)
 	#else
@@ -277,7 +277,7 @@ public class NetNamedPipe : NetTCP {
 	/// - parameter callBack: The callback to call when the receive completes. The parameter passed will be the received file descriptor or invalidSocket.
 	/// - throws: `PerfectError.NetworkError`
 	public func receiveFd(callBack cb: (Int32) -> ()) throws {
-		let length = sizeof(cmsghdr) + sizeof(Int32)
+		let length = sizeof(cmsghdr.self) + sizeof(Int32.self)
 		var msghdrr = msghdr()
 		var nothingPtr = UnsafeMutablePointer<iovec>(allocatingCapacity: 1)
 		var nothing = UnsafeMutablePointer<CChar>(allocatingCapacity: 1)

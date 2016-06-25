@@ -93,7 +93,7 @@ public class NetTCP {
 			len.deallocateCapacity(1)
 			buffer.deallocateCapacity(staticBufferSize)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in))
+		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
 		
@@ -113,7 +113,7 @@ public class NetTCP {
 			len.deallocateCapacity(1)
 			buffer.deallocateCapacity(staticBufferSize)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in))
+		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
 		
@@ -146,11 +146,11 @@ public class NetTCP {
 	#else
 		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
 	#endif
-		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in)))
+		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in.self)))
 	#if os(Linux)
-		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in)))
+		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#else
-		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in)))
+		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#endif
 		if bRes == -1 {
 			try ThrowNetworkError()
@@ -442,12 +442,12 @@ public class NetTCP {
 	#else
 		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
 	#endif
-		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in)))
+		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in.self)))
 		
 	#if os(Linux)
-		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in)))
+		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#else
-		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in)))
+		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#endif
 		if cRes != -1 {
 			callBack(self)
