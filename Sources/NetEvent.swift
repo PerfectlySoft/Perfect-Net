@@ -201,7 +201,7 @@ public class NetEvent {
 						var filter = Filter.none
 						if (evt.events & EPOLLERR.rawValue) != 0 {
 							var errData = Int32(0)
-							var errLen = socklen_t(sizeof(Int32))
+							var errLen = socklen_t(sizeof(Int32.self))
 							getsockopt(sock, SOL_SOCKET, SO_ERROR, &errData, &errLen)
 							filter = .error(errData)
 						} else if (evt.events & EPOLLIN.rawValue) != 0 {
@@ -284,7 +284,7 @@ public class NetEvent {
 		if let n = NetEvent.staticEvent {
 			let _ = n.lock.lock()
             defer { let _ = n.lock.unlock() }
-            
+
         #if os(Linux)
             var associated = invalidSocket
             if timeoutSeconds > NetEvent.noTimeout {
@@ -342,9 +342,9 @@ public class NetEvent {
 		if let n = NetEvent.staticEvent {
 			let _ = n.lock.lock()
             defer { let _ = n.lock.unlock() }
-            
+
             if let old = n.queuedSockets[oldSocket] {
-                
+
             #if os(Linux)
                 if old.associated != invalidSocket {
                     epoll_ctl(n.kq, EPOLL_CTL_DEL, old.associated, nil)
