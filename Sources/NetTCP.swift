@@ -23,7 +23,7 @@ import PerfectThread
 import SwiftGlibc
 let AF_UNSPEC: Int32 = 0
 let AF_INET: Int32 = 2
-let INADDR_NONE = UInt32(0xffffffff)
+let INADDR_NONE = UInt32(integerLiteral: 0xffffffff)
 let EINPROGRESS = Int32(115)
 #else
 import Darwin
@@ -32,7 +32,7 @@ import Darwin
 /// Provides an asynchronous IO wrapper around a file descriptor.
 /// Fully realized for TCP socket types but can also serve as a base for sockets from other families, such as with `NetNamedPipe`/AF_UNIX.
 public class NetTCP {
-	
+
 	final class ReferenceBuffer {
 		var a: [UInt8]
 		let size: Int
@@ -40,24 +40,24 @@ public class NetTCP {
 			self.size = size
 			self.a = [UInt8](repeating: 0, count: size)
 		}
-		
+
 		subscript(by: Int) -> UnsafeMutablePointer<Void> {
 			return UnsafeMutablePointer<Void>(self.a).advanced(by: by)
 		}
 	}
-	
+
 	private var networkFailure: Bool = false
 	private let reasonableMaxReadCount = 1024 * 600 // <700k is imperically the largest chuck I was reading at a go
-	
+
 	var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
-	
+
     public var isValid: Bool { return self.fd.isValid }
-    
+
 	/// Create a new object with an initially invalid socket file descriptor.
 	public init() {
-		
+
 	}
-	
+
 	/// Creates an instance which will use the given file descriptor
 	/// - parameter fd: The pre-existing file descriptor
 	public convenience init(fd: Int32) {
@@ -66,7 +66,7 @@ public class NetTCP {
 		self.fd.family = AF_INET
 		self.fd.switchToNonBlocking()
 	}
-	
+
 	/// Allocates a new socket if it has not already been done.
 	/// The functions `bind` and `connect` will call this method to ensure the socket has been allocated.
 	/// Sub-classes should override this function in order to create their specialized socket.
@@ -82,7 +82,7 @@ public class NetTCP {
 			fd.switchToNonBlocking()
 		}
 	}
-	
+
 	public func sockName() -> (String, UInt16) {
 		let staticBufferSize = 1024
 		var addr = UnsafeMutablePointer<sockaddr_in>(allocatingCapacity: 1)
@@ -96,13 +96,13 @@ public class NetTCP {
 		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
-		
+
 		let s = String(validatingUTF8: buffer) ?? ""
 		let p = addr.pointee.sin_port.netToHost
-		
+
 		return (s, p)
 	}
-	
+
 	public func peerName() -> (String, UInt16) {
 		let staticBufferSize = 1024
 		var addr = UnsafeMutablePointer<sockaddr_in>(allocatingCapacity: 1)
@@ -116,25 +116,25 @@ public class NetTCP {
 		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
-		
+
 		let s = String(validatingUTF8: buffer) ?? ""
 		let p = addr.pointee.sin_port.netToHost
-		
+
 		return (s, p)
 	}
-	
+
 	func isEAgain(err er: Int) -> Bool {
 		return er == -1 && errno == EAGAIN
 	}
-	
+
 	/// Bind the socket on the given port and optional local address
 	/// - parameter port: The port on which to bind
 	/// - parameter address: The the local address, given as a string, on which to bind. Defaults to "0.0.0.0".
 	/// - throws: PerfectError.NetworkError
 	public func bind(port prt: UInt16, address: String = "0.0.0.0") throws {
-		
+
 		initSocket()
-		
+
 		var addr: sockaddr_in = sockaddr_in()
 		let res = makeAddress(&addr, host: address, port: prt)
 		guard res != -1 else {
@@ -156,7 +156,7 @@ public class NetTCP {
 			try ThrowNetworkError()
 		}
 	}
-	
+
 	/// Switches the socket to server mode. Socket should have been previously bound using the `bind` function.
 	public func listen(backlog: Int32 = 128) {
 	#if os(Linux)
@@ -165,7 +165,7 @@ public class NetTCP {
 		let _ = Darwin.listen(fd.fd, backlog)
 	#endif
 	}
-	
+
 	/// Shuts down and closes the socket.
 	/// The object may be reused.
 	public func close() {
@@ -177,11 +177,11 @@ public class NetTCP {
 			shutdown(fd.fd, SHUT_RDWR)
 			let _ = Darwin.close(fd.fd)
 		#endif
-			
+
 			fd.fd = invalidSocket
         }
 	}
-	
+
 	func recv(into buf: UnsafeMutablePointer<Void>, count: Int) -> Int {
 	#if os(Linux)
 		return SwiftGlibc.recv(self.fd.fd, buf, count, 0)
@@ -189,7 +189,7 @@ public class NetTCP {
 		return Darwin.recv(self.fd.fd, buf, count, 0)
 	#endif
 	}
-	
+
 	func send(_ buf: UnsafePointer<Void>, count: Int) -> Int {
 	#if os(Linux)
 		return SwiftGlibc.send(self.fd.fd, buf, count, 0)
@@ -200,15 +200,15 @@ public class NetTCP {
 
 	#if swift(>=3.0)
 	private func makeAddress(_ sin: inout sockaddr_in, host: String, port: UInt16) -> Int {
-		
+
 		let bPort = port.bigEndian
 		sin.sin_port = in_port_t(bPort)
 		sin.sin_family = sa_family_t(AF_INET)
-		
+
 		defer {
 			endhostent()
 		}
-		
+
 		if let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host), firstAddress = theHost.pointee.h_addr_list.pointee {
 			sin.sin_addr.s_addr = UnsafeMutablePointer<UInt32>(firstAddress).pointee
 		} else {
@@ -218,7 +218,7 @@ public class NetTCP {
 			}
 			sin.sin_addr.s_addr = inet_addr(host)
 		}
-		
+
 		return 0
 	}
 	#else
@@ -242,25 +242,25 @@ public class NetTCP {
 		return 0
 	}
 	#endif
-	
+
 	private final func completeArray(from frm: ReferenceBuffer, count: Int) -> [UInt8] {
 		frm.a.removeLast(frm.size - count)
 		return frm.a
 	}
-	
+
 	func readBytesFully(into buffer: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
 		let readCount = recv(into: buffer[read], count: remaining)
 		if readCount == 0 {
 			completion(nil) // disconnect
 		} else if self.isEAgain(err: readCount) {
-			
+
 			// no data available. wait
 			self.readBytesFullyIncomplete(into: buffer, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
-			
+
 		} else if readCount < 0 {
 			completion(nil) // networking or other error
 		} else {
-			
+
 			// got some data
 			if remaining - readCount == 0 { // done
 				completion(completeArray(from: buffer, count: read + readCount))
@@ -269,12 +269,12 @@ public class NetTCP {
 			}
 		}
 	}
-	
+
 	func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
-		
+
 		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeoutSeconds) { [weak self]
 			fd, w in
-			
+
 			if case .read = w {
 				self?.readBytesFully(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
 			} else {
@@ -282,7 +282,7 @@ public class NetTCP {
 			}
 		}
 	}
-	
+
 	/// Read the indicated number of bytes and deliver them on the provided callback.
 	/// - parameter count: The number of bytes to read
 	/// - parameter timeoutSeconds: The number of seconds to wait for the requested number of bytes. A timeout value of negative one indicates that the request should have no timeout.
@@ -292,12 +292,12 @@ public class NetTCP {
 		let ptr = ReferenceBuffer(size: cnt)
 		readBytesFully(into: ptr, read: 0, remaining: cnt, timeoutSeconds: timeoutSeconds, completion: completion)
 	}
-	
+
 	/// Read up to the indicated number of bytes and deliver them on the provided callback.
 	/// - parameter count: The maximum number of bytes to read.
 	/// - parameter completion: The callback on which to deliver the results. If an error occurs during the read then a nil object will be passed to the callback, otherwise, the immediately available number of bytes, which may be zero, will be passed.
 	public func readSomeBytes(count cnt: Int, completion: ([UInt8]?) -> ()) {
-		
+
 		let readRead = min(cnt, self.reasonableMaxReadCount)
 		let ptr = ReferenceBuffer(size: readRead)
 		let readCount = recv(into: ptr[0], count: readRead)
@@ -314,21 +314,21 @@ public class NetTCP {
 			}
 		}
 	}
-	
+
 	/// Write the string and call the callback with the number of bytes which were written.
 	/// - parameter s: The string to write. The string will be written based on its UTF-8 encoding.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
 	public func write(string strng: String, completion: (Int) -> ()) {
 		write(bytes: [UInt8](strng.utf8), completion: completion)
 	}
-	
+
 	/// Write the indicated bytes and call the callback with the number of bytes which were written.
 	/// - parameter bytes: The array of UInt8 to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
 	public func write(bytes byts: [UInt8], completion: (Int) -> ()) {
 		write(bytes: byts, dataPosition: 0, length: byts.count, completion: completion)
 	}
-	
+
 	/// Write the indicated bytes and return true if all data was sent.
 	/// - parameter bytes: The array of UInt8 to write.
 	public func writeFully(bytes byts: [UInt8]) -> Bool {
@@ -337,7 +337,7 @@ public class NetTCP {
 		let ptr = UnsafeMutablePointer<UInt8>(byts)
 		var s: Threading.Event?
 		var what: NetEvent.Filter = .none
-		
+
 		let waitFunc = {
 			NetEvent.add(socket: self.fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 				_, w in
@@ -347,18 +347,18 @@ public class NetTCP {
 				let _ = s?.unlock()
 			}
 		}
-		
+
 		while length > 0 {
-			
+
 			let sent = send(ptr.advanced(by: totalSent), count: length - totalSent)
 			if sent == length {
 				return true
 			}
-			
+
 			if s == nil {
 				s = Threading.Event()
 			}
-			
+
 			if sent == -1 {
 				if isEAgain(err: sent) { // flow
 					let _ = s!.lock()
@@ -368,36 +368,36 @@ public class NetTCP {
 				}
 			} else {
 				totalSent += sent
-				
+
 				if totalSent == length {
 					return true
 				}
 				let _ = s!.lock()
 				waitFunc()
 			}
-			
+
 			let _ = s!.wait()
 			let _ = s!.unlock()
 			if case .write = what {
-			
+
 			} else {
 				break
 			}
 		}
 		return totalSent == length
 	}
-			 
+
 	/// Write the indicated bytes and call the callback with the number of bytes which were written.
 	/// - parameter bytes: The array of UInt8 to write.
 	/// - parameter dataPosition: The offset within `bytes` at which to begin writing.
 	/// - parameter length: The number of bytes to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
 	public func write(bytes byts: [UInt8], dataPosition: Int, length: Int, completion: (Int) -> ()) {
-		
+
 		let ptr = UnsafeMutablePointer<UInt8>(byts).advanced(by: dataPosition)
 		write(bytes: ptr, wrote: 0, length: length, completion: completion)
 	}
-	
+
 	func write(bytes byts: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
 		let sent = send(byts, count: length)
 		if isEAgain(err: sent) {
@@ -411,16 +411,16 @@ public class NetTCP {
 			completion(wrote + sent)
 		}
 	}
-	
+
 	func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
-		
+
 		NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 			fd, w in
-			
+
 			self.write(bytes: nptr, wrote: wrote, length: length, completion: completion)
 		}
 	}
-	
+
 	/// Connect to the indicated server
 	/// - parameter address: The server's address, expressed as a string.
 	/// - parameter port: The port on which to connect.
@@ -428,9 +428,9 @@ public class NetTCP {
 	/// - parameter callBack: The closure which will be called when the connection completes. If the connection completes successfully then the current NetTCP instance will be passed to the callback, otherwise, a nil object will be passed.
 	/// - returns: `PerfectError.NetworkError`
 	public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: (NetTCP?) -> ()) throws {
-		
+
 		initSocket()
-		
+
 		var addr: sockaddr_in = sockaddr_in()
 		let res = makeAddress(&addr, host: addrs, port: port)
 		guard res != -1 else {
@@ -465,7 +465,7 @@ public class NetTCP {
 			}
 		}
 	}
-	
+
 	/// Accept a new client connection and pass the result to the callback.
 	/// - parameter timeoutSeconds: The number of seconds to wait for a new connection to arrive. A timeout value of negative one indicates that there is no timeout.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
@@ -483,10 +483,10 @@ public class NetTCP {
 			guard self.isEAgain(err: Int(accRes)) else {
 				try ThrowNetworkError()
 			}
-			
+
 			NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) {
 				fd, w in
-			
+
 				if case .timer = w {
 					callBack(nil)
 				} else {
@@ -499,7 +499,7 @@ public class NetTCP {
 			}
 		}
 	}
-	
+
 	private func tryAccept() -> Int32 {
 		#if os(Linux)
 			let accRes = SwiftGlibc.accept(fd.fd, nil, nil)
@@ -509,7 +509,7 @@ public class NetTCP {
 
 		return accRes
 	}
-	
+
 	/// Accept a series of new client connections and pass them to the callback. This function does not return outside of a catastrophic error.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
 	public func forEachAccept(callBack: (NetTCP?) -> ()) {
@@ -527,13 +527,8 @@ public class NetTCP {
 			}
 		} while !networkFailure && self.fd.fd != invalidSocket
 	}
-	
+
 	func makeFromFd(_ fd: Int32) -> NetTCP {
 		return NetTCP(fd: fd)
 	}
 }
-
-
-
-
-
