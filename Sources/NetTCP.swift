@@ -399,7 +399,7 @@ public class NetTCP {
 	}
 	
 	func write(bytes byts: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
-		let sent = send(byts, count: length)
+        let sent = send(byts, count: length)
 		if isEAgain(err: sent) {
 			writeIncomplete(bytes: byts, wrote: wrote, length: length, completion: completion)
 		} else if sent == -1 {
@@ -478,35 +478,30 @@ public class NetTCP {
 	#endif
 		if accRes != -1 {
 			let newTcp = self.makeFromFd(accRes)
-			callBack(newTcp)
-		} else {
-			guard self.isEAgain(err: Int(accRes)) else {
-				try ThrowNetworkError()
-			}
-			
-			NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) {
-				fd, w in
-			
-				if case .timer = w {
-					callBack(nil)
-				} else {
-					do {
-						try self.accept(timeoutSeconds: timeout, callBack: callBack)
-					} catch {
-						callBack(nil)
-					}
-				}
-			}
+			return callBack(newTcp)
 		}
+        guard self.isEAgain(err: Int(accRes)) else {
+            try ThrowNetworkError()
+        }
+        NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) {
+            fd, w in
+            if case .timer = w {
+                return callBack(nil)
+            }
+            do {
+                try self.accept(timeoutSeconds: timeout, callBack: callBack)
+            } catch {
+                callBack(nil)
+            }
+        }
 	}
 	
 	private func tryAccept() -> Int32 {
-		#if os(Linux)
-			let accRes = SwiftGlibc.accept(fd.fd, nil, nil)
-		#else
-			let accRes = Darwin.accept(fd.fd, nil, nil)
-		#endif
-
+    #if os(Linux)
+        let accRes = SwiftGlibc.accept(fd.fd, nil, nil)
+    #else
+        let accRes = Darwin.accept(fd.fd, nil, nil)
+    #endif
 		return accRes
 	}
 	
@@ -520,7 +515,7 @@ public class NetTCP {
 				Threading.dispatch {
 					callBack(self.makeFromFd(accRes))
 				}
-			} else {
+			} else if errno != EINTR {
 				let errStr = String(validatingUTF8: strerror(Int32(errno))) ?? "NO MESSAGE"
 				print("Unexpected networking error: \(errno) '\(errStr)'")
 				networkFailure = true
