@@ -64,6 +64,7 @@ public struct SocketFileDescriptor {
 #endif
         var one = Int32(1)
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32.self)))
+		setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, UInt32(sizeof(Int32.self)));
 	}
     
     func switchToBlocking() {

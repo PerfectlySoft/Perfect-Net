@@ -198,7 +198,6 @@ public class NetTCP {
 	#endif
 	}
 
-	#if swift(>=3.0)
 	private func makeAddress(_ sin: inout sockaddr_in, host: String, port: UInt16) -> Int {
 		
 		let bPort = port.bigEndian
@@ -221,27 +220,6 @@ public class NetTCP {
 		
 		return 0
 	}
-	#else
-	private func makeAddress(inout sin: sockaddr_in, host: String, port: UInt16) -> Int {
-		let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host)
-		if theHost == nil {
-			if inet_addr(host) == INADDR_NONE {
-				endhostent()
-				return -1
-			}
-		}
-		let bPort = port.bigEndian
-		sin.sin_port = in_port_t(bPort)
-		sin.sin_family = sa_family_t(AF_INET)
-		if theHost != nil {
-			sin.sin_addr.s_addr = UnsafeMutablePointer<UInt32>(theHost.pointee.h_addr_list.pointee).pointee
-		} else {
-			sin.sin_addr.s_addr = inet_addr(host)
-		}
-		endhostent()
-		return 0
-	}
-	#endif
 	
 	private final func completeArray(from frm: ReferenceBuffer, count: Int) -> [UInt8] {
 		frm.a.removeLast(frm.size - count)
