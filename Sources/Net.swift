@@ -48,23 +48,24 @@ public struct SocketFileDescriptor {
         guard self.fd != invalidSocket else {
             return
         }
-        
-#if os(Linux)
+	#if os(Linux)
         let flags = linux_fcntl_get(fd, F_GETFL)
         guard flags >= 0 else {
             return
         }
         let _ = linux_fcntl_set(fd, F_SETFL, flags | O_NONBLOCK)
-#else
+	#else
         let flags = fcntl(fd, F_GETFL)
         guard flags >= 0 else {
             return
         }
         let _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
-#endif
+	#endif
         var one = Int32(1)
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32.self)))
+	#if os(OSX)
 		setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, UInt32(sizeof(Int32.self)));
+	#endif
 	}
     
     func switchToBlocking() {
