@@ -91,7 +91,7 @@ class PerfectNetTests: XCTestCase {
                 })
             #endif
             
-        } catch PerfectNetError.NetworkError(let code, let msg) {
+        } catch PerfectNetError.networkError(let code, let msg) {
             XCTAssert(false, "Exception: \(code) \(msg)")
         } catch let e {
             XCTAssert(false, "Exception: \(e)")
@@ -164,7 +164,7 @@ class PerfectNetTests: XCTestCase {
                 })
             #endif
             
-        } catch PerfectNetError.NetworkError(let code, let msg) {
+        } catch PerfectNetError.networkError(let code, let msg) {
             XCTAssert(false, "Exception: \(code) \(msg)")
         } catch let e {
             XCTAssert(false, "Exception: \(e)")
