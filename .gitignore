@@ -63,4 +63,4 @@ fastlane/report.xml
 fastlane/screenshots
 
 Packages/
-PerfectNet.xcodeproj/
+#PerfectNet.xcodeproj/
