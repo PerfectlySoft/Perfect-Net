@@ -274,6 +274,9 @@ public class NetEvent {
 
 	// socket can only be queued with one callback at a time
 	static func add(socket newSocket: SocketType, what: Filter, timeoutSeconds: Double, callback: EventCallback) {
+		
+		NetEvent.initialize()
+		
 		let threadingCallback: EventCallback = {
 			s, f in
 			Threading.dispatch {
