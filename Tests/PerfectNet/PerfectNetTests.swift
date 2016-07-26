@@ -15,8 +15,8 @@ class PerfectNetTests: XCTestCase {
             let client = NetTCP()
             try server.bind(port: port, address: "127.0.0.1")
             server.listen()
-            let serverExpectation = self.expectation(withDescription: "server")
-            let clientExpectation = self.expectation(withDescription: "client")
+            let serverExpectation = self.expectation(description: "server")
+            let clientExpectation = self.expectation(description: "client")
             try server.accept(timeoutSeconds: NetEvent.noTimeout) {
                 (inn: NetTCP?) -> () in
                 guard let n = inn else {
@@ -58,7 +58,7 @@ class PerfectNetTests: XCTestCase {
                     }
                 }
             }
-			self.waitForExpectations(withTimeout: 10000, handler: {
+			self.waitForExpectations(timeout: 10000, handler: {
 				_ in
 				server.close()
 				client.close()
@@ -77,8 +77,8 @@ class PerfectNetTests: XCTestCase {
             let client = NetTCP()
             try server.bind(port: port, address: "127.0.0.1")
             server.listen()
-            let serverExpectation = self.expectation(withDescription: "server")
-            let clientExpectation = self.expectation(withDescription: "client")
+            let serverExpectation = self.expectation(description: "server")
+            let clientExpectation = self.expectation(description: "client")
             try server.accept(timeoutSeconds: NetEvent.noTimeout) {
                 (inn: NetTCP?) -> () in
                 guard let _ = inn else {
@@ -107,7 +107,7 @@ class PerfectNetTests: XCTestCase {
                     }
                 }
             }
-			self.waitForExpectations(withTimeout: 10000, handler: {
+			self.waitForExpectations(timeout: 10000, handler: {
 				_ in
 				server.close()
 				client.close()
@@ -123,7 +123,7 @@ class PerfectNetTests: XCTestCase {
         let address = "www.treefrog.ca"
         let requestString = [UInt8](("GET / HTTP/1.0\r\nHost: \(address)\r\n\r\n").utf8)
         let requestCount = requestString.count
-		let clientExpectation = self.expectation(withDescription: "client")
+		let clientExpectation = self.expectation(description: "client")
         let net = NetTCPSSL()
         let setOk = net.setDefaultVerifyPaths()
         XCTAssert(setOk, "Unable to setDefaultVerifyPaths \(net.sslErrorCode(resultCode: 1))")
@@ -179,7 +179,7 @@ class PerfectNetTests: XCTestCase {
         } catch {
             XCTAssert(false, "Exception thrown")
         }
-		self.waitForExpectations(withTimeout: 10000) {
+		self.waitForExpectations(timeout: 10000) {
 			_ in
 			net.close()
 		}
