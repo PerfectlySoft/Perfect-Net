@@ -20,11 +20,7 @@
 import OpenSSL
 import PerfectThread
 
-#if swift(>=3.0)
 private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutablePointer<Void>?) -> Int32
-#else
-private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>, Int32, Int32, UnsafeMutablePointer<Void>) -> Int32
-#endif
 
 public class NetTCPSSL : NetTCP {
 
@@ -55,16 +51,9 @@ public class NetTCPSSL : NetTCP {
 			i2d_PUBKEY(pk, &mp)
 
 			var ret = [UInt8]()
-		#if swift(>=3.0)
 			guard let ensure = mp else {
 				return ret
 			}
-		#else
-			guard nil != mp else {
-				return ret
-			}
-			let ensure = mp
-		#endif
 			defer {
 				free(mp)
 				EVP_PKEY_free(pk)
@@ -103,7 +92,7 @@ public class NetTCPSSL : NetTCP {
 				let callback: passwordCallbackFunc = {
 					(buf, size, rwflag, userData) -> Int32 in
 				
-					guard let userDataCheck = userData, bufCheck = buf else {
+					guard let userDataCheck = userData, let bufCheck = buf else {
 						return 0
 					}
                     
@@ -139,18 +128,9 @@ public class NetTCPSSL : NetTCP {
 			}
 			var i = Int32(0)
 			while true {
-
-			#if swift(>=3.0)
 				guard let n = SSL_get_cipher_list(ssl, i) else {
 					break
 				}
-			#else
-				let n = SSL_get_cipher_list(ssl, i)
-				guard nil != n else {
-					break
-				}
-			#endif
-
 				a.append(String(validatingUTF8: n)!)
 				i += 1
 			}
@@ -203,7 +183,7 @@ public class NetTCPSSL : NetTCP {
 			SSL_shutdown(ssl)
 			SSL_free(ssl)
 		}
-		if let sslCtx = self.sslCtx where self.sharedSSLCtx == false {
+		if let sslCtx = self.sslCtx, self.sharedSSLCtx == false {
 			SSL_CTX_free(sslCtx)
 		}
 	}
@@ -250,9 +230,9 @@ public class NetTCPSSL : NetTCP {
 
 	public func errorStr(forCode errorCode: Int32) -> String {
 		let maxLen = 1024
-        let buf = UnsafeMutablePointer<Int8>(allocatingCapacity: maxLen)
+        let buf = UnsafeMutablePointer<Int8>.allocate(capacity: maxLen)
 		defer {
-			buf.deallocateCapacity(maxLen)
+			buf.deallocate(capacity: maxLen)
 		}
 		ERR_error_string_n(UInt(errorCode), buf, maxLen)
 		let ret = String(validatingUTF8: buf) ?? ""
@@ -260,16 +240,9 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func reasonErrorStr(errorCode: Int32) -> String {
-	#if swift(>=3.0)
 		guard let buf = ERR_reason_error_string(UInt(errorCode)) else {
 			return ""
 		}
-	#else
-		let buf = ERR_reason_error_string(UInt(errorCode))
-		guard nil != buf else {
-			return ""
-		}
-	#endif
 		let ret = String(validatingUTF8: buf) ?? ""
 		return ret
 	}
@@ -333,7 +306,6 @@ public class NetTCPSSL : NetTCP {
 
 		NetEvent.add(socket: fd.fd, what: what, timeoutSeconds: NetEvent.noTimeout) { [weak self]
 			fd, w in
-
 			self?.write(bytes: nptr, wrote: wrote, length: length, completion: completion)
 		}
 	}
@@ -344,7 +316,7 @@ public class NetTCPSSL : NetTCP {
 			SSL_free(ssl)
 			self.ssl = nil
 		}
-		if let sslCtx = self.sslCtx where self.sharedSSLCtx == false {
+		if let sslCtx = self.sslCtx, self.sharedSSLCtx == false {
 			SSL_CTX_free(sslCtx)
 		}
 		self.sslCtx = nil

@@ -85,13 +85,13 @@ public class NetTCP {
 	
 	public func sockName() -> (String, UInt16) {
 		let staticBufferSize = 1024
-		var addr = UnsafeMutablePointer<sockaddr_in>(allocatingCapacity: 1)
-		var len = UnsafeMutablePointer<socklen_t>(allocatingCapacity: 1)
-		let buffer = UnsafeMutablePointer<Int8>(allocatingCapacity: staticBufferSize)
+		var addr = UnsafeMutablePointer<sockaddr_in>.allocate(capacity: 1)
+		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
+		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
 		defer {
-			addr.deallocateCapacity(1)
-			len.deallocateCapacity(1)
-			buffer.deallocateCapacity(staticBufferSize)
+			addr.deallocate(capacity: 1)
+			len.deallocate(capacity: 1)
+			buffer.deallocate(capacity: staticBufferSize)
 		}
 		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
@@ -105,13 +105,13 @@ public class NetTCP {
 	
 	public func peerName() -> (String, UInt16) {
 		let staticBufferSize = 1024
-		var addr = UnsafeMutablePointer<sockaddr_in>(allocatingCapacity: 1)
-		var len = UnsafeMutablePointer<socklen_t>(allocatingCapacity: 1)
-		let buffer = UnsafeMutablePointer<Int8>(allocatingCapacity: staticBufferSize)
+		var addr = UnsafeMutablePointer<sockaddr_in>.allocate(capacity: 1)
+		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
+		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
 		defer {
-			addr.deallocateCapacity(1)
-			len.deallocateCapacity(1)
-			buffer.deallocateCapacity(staticBufferSize)
+			addr.deallocate(capacity: 1)
+			len.deallocate(capacity: 1)
+			buffer.deallocate(capacity: staticBufferSize)
 		}
 		len.pointee = socklen_t(sizeof(sockaddr_in.self))
 		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
@@ -208,7 +208,7 @@ public class NetTCP {
 			endhostent()
 		}
 		
-		if let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host), firstAddress = theHost.pointee.h_addr_list.pointee {
+		if let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host), let firstAddress = theHost.pointee.h_addr_list.pointee {
 			sin.sin_addr.s_addr = UnsafeMutablePointer<UInt32>(firstAddress).pointee
 		} else {
 			if inet_addr(host) == INADDR_NONE {

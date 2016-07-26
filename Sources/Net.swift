@@ -110,13 +110,12 @@ extension UInt16: BytesSwappingUnsignedInteger {}
 extension UInt32: BytesSwappingUnsignedInteger {}
 extension UInt64: BytesSwappingUnsignedInteger {}
 
-public enum PerfectNetError : ErrorProtocol {
+public enum PerfectNetError : Error {
     /// A network related error code and message.
     case networkError(Int32, String)
 }
 
-@noreturn
-func ThrowNetworkError(file: String = #file, function: String = #function, line: Int = #line) throws {
+func ThrowNetworkError(file: String = #file, function: String = #function, line: Int = #line) throws -> Never {
     let err = errno
     let msg = String(validatingUTF8: strerror(err))!
     throw PerfectNetError.networkError(err, msg + " \(file) \(function) \(line)")

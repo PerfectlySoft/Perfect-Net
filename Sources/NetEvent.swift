@@ -42,8 +42,7 @@ import PerfectThread
 
 #endif
 
-@noreturn
-func logTerminal(message: String) {
+func logTerminal(message: String) -> Never  {
     print(message)
     exit(-1)
 }
@@ -143,7 +142,7 @@ public class NetEvent {
 		guard self.kq != -1 else {
 			logTerminal(message: "Unable to initialize event listener.")
 		}
-		self.evlist = UnsafeMutablePointer<event>(allocatingCapacity: self.numEvents)
+		self.evlist = UnsafeMutablePointer<event>.allocate(capacity: self.numEvents)
 		memset(self.evlist, 0, sizeof(event.self) * self.numEvents)
 	}
 
