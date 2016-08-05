@@ -55,8 +55,10 @@ public class NetNamedPipe : NetTCP {
 			addr.deallocate(capacity: 1)
 			len.deallocate(capacity: 1)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in.self))
-		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
+		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
+		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			getsockname(fd.fd, $0, len)
+		}
 
 		var nameBuf = [CChar]()
 		let mirror = Mirror(reflecting: addr.pointee.sun_path)
@@ -82,9 +84,10 @@ public class NetNamedPipe : NetTCP {
 			addr.deallocate(capacity: 1)
 			len.deallocate(capacity: 1)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in.self))
-		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
-
+		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
+		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			getpeername(fd.fd, $0, len)
+		}
 		var nameBuf = [CChar]()
 		let mirror = Mirror(reflecting: addr.pointee.sun_path)
 		let childGen = mirror.children.makeIterator()
@@ -107,7 +110,7 @@ public class NetNamedPipe : NetTCP {
 #if os(Linux) // BSDs have a size identifier in front, Linux does not
 		let addrLen = sizeof(sockaddr_un.self)
 #else
-		let addrLen = sizeof(UInt8.self) + sizeof(sa_family_t.self) + utf8.count + 1
+		let addrLen = MemoryLayout<UInt8>.size + MemoryLayout<sa_family_t>.size + utf8.count + 1
 #endif
 		let addrPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: addrLen)
 
@@ -145,12 +148,16 @@ public class NetNamedPipe : NetTCP {
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
 		defer { addrPtr.deallocate(capacity: addrLen) }
-
-	#if os(Linux)
-		let bRes = SwiftGlibc.bind(fd.fd, UnsafePointer<sockaddr>(addrPtr), socklen_t(addrLen))
+		
+		let bRes = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			(p:UnsafeMutablePointer<sockaddr>) -> Int32 in
+		#if os(Linux)
+			return SwiftGlibc.bind(fd.fd, p, socklen_t(addrLen))
 		#else
-		let bRes = Darwin.bind(fd.fd, UnsafePointer<sockaddr>(addrPtr), socklen_t(addrLen))
-	#endif
+			return Darwin.bind(fd.fd, p, socklen_t(addrLen))
+		#endif
+		}
+		
 		if bRes == -1 {
 			try ThrowNetworkError()
 		}
@@ -161,18 +168,21 @@ public class NetNamedPipe : NetTCP {
 	/// - parameter timeoutSeconds: The number of seconds to wait for the connection to complete. A timeout of negative one indicates that there is no timeout.
 	/// - parameter callBack: The closure which will be called when the connection completes. If the connection completes successfully then the current NetNamedPipe instance will be passed to the callback, otherwise, a nil object will be passed.
 	/// - returns: `PerfectError.NetworkError`
-	public func connect(address addr: String, timeoutSeconds: Double, callBack: (NetNamedPipe?) -> ()) throws {
+	public func connect(address addr: String, timeoutSeconds: Double, callBack: @escaping (NetNamedPipe?) -> ()) throws {
 
 		initSocket()
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
 		defer { addrPtr.deallocate(capacity: addrLen) }
 
-	#if os(Linux)
-		let cRes = SwiftGlibc.connect(fd.fd, UnsafePointer<sockaddr>(addrPtr), socklen_t(addrLen))
-	#else
-		let cRes = Darwin.connect(fd.fd, UnsafePointer<sockaddr>(addrPtr), socklen_t(addrLen))
-	#endif
+		let cRes = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			(p:UnsafeMutablePointer<sockaddr>) -> Int32 in
+		#if os(Linux)
+			return SwiftGlibc.connect(fd.fd, p, socklen_t(addrLen))
+		#else
+			return Darwin.connect(fd.fd, p, socklen_t(addrLen))
+		#endif
+		}
 		if cRes != -1 {
 			callBack(self)
 		} else {
@@ -196,8 +206,8 @@ public class NetNamedPipe : NetTCP {
 	/// - parameter fd: The file descriptor to send
 	/// - parameter callBack: The callback to call when the send completes. The parameter passed will be `true` if the send completed without error.
 	/// - throws: `PerfectError.NetworkError`
-	public func sendFd(_ fd: Int32, callBack: (Bool) -> ()) throws {
-		let length = sizeof(cmsghdr.self) + sizeof(Int32.self)
+	public func sendFd(_ fd: Int32, callBack: @escaping (Bool) -> ()) throws {
+		let length = MemoryLayout<cmsghdr>.size + MemoryLayout<Int32>.size
 	#if os(Linux)
 		var msghdr = UnsafeMutablePointer<SwiftGlibc.msghdr>.allocate(capacity: 1)
 	#else
@@ -205,15 +215,15 @@ public class NetNamedPipe : NetTCP {
 	#endif
 		var nothingPtr = UnsafeMutablePointer<iovec>.allocate(capacity: 1)
 		var nothing = UnsafeMutablePointer<CChar>.allocate(capacity: 1)
-		let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: length)
+		let buffer = UnsafeMutableRawPointer.allocate(bytes: length, alignedTo: 8)
 		defer {
 			msghdr.deallocate(capacity: 1)
-			buffer.deallocate(capacity: length)
+			buffer.deallocate(bytes: length, alignedTo: 8)
 			nothingPtr.deallocate(capacity: 1)
 			nothing.deallocate(capacity: 1)
 		}
 
-		var cmsg = UnsafeMutablePointer<cmsghdr>(buffer)
+		var cmsg = buffer.assumingMemoryBound(to: cmsghdr.self)
 	#if os(Linux)
 		cmsg.pointee.cmsg_len = Int(socklen_t(length))
 	#else
@@ -221,20 +231,20 @@ public class NetNamedPipe : NetTCP {
 	#endif
 		cmsg.pointee.cmsg_level = SOL_SOCKET
 		cmsg.pointee.cmsg_type = SCM_RIGHTS
-		let asInts = UnsafeMutablePointer<Int32>(cmsg.advanced(by: 1))
+		let asInts = cmsg.advanced(by: 1).withMemoryRebound(to: Int32.self, capacity: 1) { $0 }
 		asInts.pointee = fd
 
 		nothing.pointee = 33
 
-		nothingPtr.pointee.iov_base = UnsafeMutablePointer<Void>(nothing)
+		nothingPtr.pointee.iov_base = UnsafeMutableRawPointer(nothing)
 		nothingPtr.pointee.iov_len = 1
 
-		msghdr.pointee.msg_name = UnsafeMutablePointer<Void>(nil)
+		msghdr.pointee.msg_name = nil
 		msghdr.pointee.msg_namelen = 0
 		msghdr.pointee.msg_flags = 0
 		msghdr.pointee.msg_iov = nothingPtr
 		msghdr.pointee.msg_iovlen = 1
-		msghdr.pointee.msg_control = UnsafeMutablePointer<Void>(buffer)
+		msghdr.pointee.msg_control = UnsafeMutableRawPointer(buffer)
 	#if os(Linux)
 		msghdr.pointee.msg_controllen = Int(socklen_t(length))
 	#else
@@ -264,33 +274,33 @@ public class NetNamedPipe : NetTCP {
 	/// Receive an existing opened file descriptor from the sender
 	/// - parameter callBack: The callback to call when the receive completes. The parameter passed will be the received file descriptor or invalidSocket.
 	/// - throws: `PerfectError.NetworkError`
-	public func receiveFd(callBack cb: (Int32) -> ()) throws {
-		let length = sizeof(cmsghdr.self) + sizeof(Int32.self)
+	public func receiveFd(callBack cb: @escaping (Int32) -> ()) throws {
+		let length = MemoryLayout<cmsghdr>.size + MemoryLayout<Int32>.size
 		var msghdrr = msghdr()
 		var nothingPtr = UnsafeMutablePointer<iovec>.allocate(capacity: 1)
 		var nothing = UnsafeMutablePointer<CChar>.allocate(capacity: 1)
-		let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: length)
+		let buffer = UnsafeMutableRawPointer.allocate(bytes: length, alignedTo: 8)
 		defer {
-			buffer.deallocate(capacity: length)
+			buffer.deallocate(bytes: length, alignedTo: 8)
 			nothingPtr.deallocate(capacity: 1)
 			nothing.deallocate(capacity: 1)
 		}
 
 		nothing.pointee = 33
 
-		nothingPtr.pointee.iov_base = UnsafeMutablePointer<Void>(nothing)
+		nothingPtr.pointee.iov_base = UnsafeMutableRawPointer(nothing)
 		nothingPtr.pointee.iov_len = 1
 
 		msghdrr.msg_iov = UnsafeMutablePointer<iovec>(nothingPtr)
 		msghdrr.msg_iovlen = 1
-		msghdrr.msg_control = UnsafeMutablePointer<Void>(buffer)
+		msghdrr.msg_control = UnsafeMutableRawPointer(buffer)
 	#if os(Linux)
 		msghdrr.msg_controllen = Int(socklen_t(length))
 	#else
 		msghdrr.msg_controllen = socklen_t(length)
 	#endif
 
-		var cmsg = UnsafeMutablePointer<cmsghdr>(buffer)
+		var cmsg = buffer.assumingMemoryBound(to: cmsghdr.self)
 	#if os(Linux)
 		cmsg.pointee.cmsg_len = Int(socklen_t(length))
 	#else
@@ -298,9 +308,10 @@ public class NetNamedPipe : NetTCP {
 	#endif
 		cmsg.pointee.cmsg_level = SOL_SOCKET
 		cmsg.pointee.cmsg_type = SCM_RIGHTS
-		let asInts = UnsafeMutablePointer<Int32>(cmsg.advanced(by: 1))
+		
+		let asInts = cmsg.advanced(by: 1).withMemoryRebound(to: Int32.self, capacity: 1) { $0 }
 		asInts.pointee = -1
-
+		
 		let res = recvmsg(Int32(self.fd.fd), &msghdrr, 0)
 		if res > 0 {
 			let receivedInt = asInts.pointee
@@ -326,7 +337,7 @@ public class NetNamedPipe : NetTCP {
 	/// Receive an existing opened `NetTCP` descriptor from the sender
 	/// - parameter callBack: The callback to call when the receive completes. The parameter passed will be the received `NetTCP` object or nil.
 	/// - throws: `PerfectError.NetworkError`
-	public func receiveNetTCP(callBack: (NetTCP?) -> ()) throws {
+	public func receiveNetTCP(callBack: @escaping (NetTCP?) -> ()) throws {
 		try self.receiveFd {
 			(fd: Int32) -> () in
 
@@ -341,7 +352,7 @@ public class NetNamedPipe : NetTCP {
 	/// Receive an existing opened `NetNamedPipe` descriptor from the sender
 	/// - parameter callBack: The callback to call when the receive completes. The parameter passed will be the received `NetNamedPipe` object or nil.
 	/// - throws: `PerfectError.NetworkError`
-	public func receiveNetNamedPipe(callBack: (NetNamedPipe?) -> ()) throws {
+	public func receiveNetNamedPipe(callBack: @escaping (NetNamedPipe?) -> ()) throws {
 		try self.receiveFd {
 			(fd: Int32) -> () in
 

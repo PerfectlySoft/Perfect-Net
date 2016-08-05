@@ -143,7 +143,7 @@ public class NetEvent {
 			logTerminal(message: "Unable to initialize event listener.")
 		}
 		self.evlist = UnsafeMutablePointer<event>.allocate(capacity: self.numEvents)
-		memset(self.evlist, 0, sizeof(event.self) * self.numEvents)
+		memset(self.evlist, 0, MemoryLayout<event>.size * self.numEvents)
 	}
 
 	public static func initialize() {

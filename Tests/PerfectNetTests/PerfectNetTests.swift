@@ -156,15 +156,15 @@ class PerfectNetTests: XCTestCase {
                                 XCTAssert(readBytes != nil && readBytes!.count > 0)
                                 var readBytesCpy = readBytes!
                                 readBytesCpy.append(0)
-                                let ptr = UnsafeMutablePointer<CChar>(readBytesCpy)
-                                let s1 = String(validatingUTF8: ptr)!
+                                let ptr = UnsafeRawPointer(readBytesCpy)
+                                let s1 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
                                 ssl.readSomeBytes(count: 4096) {
                                     readBytes in
                                     XCTAssert(readBytes != nil && readBytes!.count > 0)
                                     var readBytesCpy = readBytes!
-                                    readBytesCpy.append(0)
-                                    let ptr = UnsafeMutablePointer<CChar>(readBytesCpy)
-                                    let s2 = String(validatingUTF8: ptr)!
+									readBytesCpy.append(0)
+									let ptr = UnsafeRawPointer(readBytesCpy)
+									let s2 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
                                     let s = s1 + s2
                                     XCTAssert(s.characters.starts(with: "HTTP/1.1 200 OK".characters))
                                     clientExpectation.fulfill()

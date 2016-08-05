@@ -41,8 +41,8 @@ public class NetTCP {
 			self.a = [UInt8](repeating: 0, count: size)
 		}
 		
-		subscript(by: Int) -> UnsafeMutablePointer<Void> {
-			return UnsafeMutablePointer<Void>(self.a).advanced(by: by)
+		subscript(by: Int) -> UnsafeMutableRawPointer {
+			return UnsafeMutableRawPointer(mutating: UnsafePointer<Void>(self.a).advanced(by: by))
 		}
 	}
 	
@@ -93,8 +93,10 @@ public class NetTCP {
 			len.deallocate(capacity: 1)
 			buffer.deallocate(capacity: staticBufferSize)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in.self))
-		getsockname(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
+		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
+		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			getsockname(fd.fd, $0, len)
+		}
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
 		
 		let s = String(validatingUTF8: buffer) ?? ""
@@ -113,8 +115,10 @@ public class NetTCP {
 			len.deallocate(capacity: 1)
 			buffer.deallocate(capacity: staticBufferSize)
 		}
-		len.pointee = socklen_t(sizeof(sockaddr_in.self))
-		getpeername(fd.fd, UnsafeMutablePointer<sockaddr>(addr), len)
+		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
+		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			getpeername(fd.fd, $0, len)
+		}
 		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
 		
 		let s = String(validatingUTF8: buffer) ?? ""
@@ -146,11 +150,11 @@ public class NetTCP {
 	#else
 		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
 	#endif
-		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in.self)))
+		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
 	#if os(Linux)
 		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#else
-		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
+		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#endif
 		if bRes == -1 {
 			try ThrowNetworkError()
@@ -182,7 +186,7 @@ public class NetTCP {
         }
 	}
 	
-	func recv(into buf: UnsafeMutablePointer<Void>, count: Int) -> Int {
+	func recv(into buf: UnsafeMutableRawPointer, count: Int) -> Int {
 	#if os(Linux)
 		return SwiftGlibc.recv(self.fd.fd, buf, count, 0)
 	#else
@@ -190,7 +194,7 @@ public class NetTCP {
 	#endif
 	}
 	
-	func send(_ buf: UnsafePointer<Void>, count: Int) -> Int {
+	func send(_ buf: UnsafeRawPointer, count: Int) -> Int {
 	#if os(Linux)
 		return SwiftGlibc.send(self.fd.fd, buf, count, 0)
 	#else
@@ -209,7 +213,7 @@ public class NetTCP {
 		}
 		
 		if let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host), let firstAddress = theHost.pointee.h_addr_list.pointee {
-			sin.sin_addr.s_addr = UnsafeMutablePointer<UInt32>(firstAddress).pointee
+			sin.sin_addr.s_addr = UnsafeMutableRawPointer(firstAddress).assumingMemoryBound(to: UInt32.self).pointee
 		} else {
 			if inet_addr(host) == INADDR_NONE {
 				endhostent()
@@ -226,7 +230,7 @@ public class NetTCP {
 		return frm.a
 	}
 	
-	func readBytesFully(into buffer: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
+	func readBytesFully(into buffer: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
 		let readCount = recv(into: buffer[read], count: remaining)
 		if readCount == 0 {
 			completion(nil) // disconnect
@@ -248,7 +252,7 @@ public class NetTCP {
 		}
 	}
 	
-	func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
+	func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
 		
 		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeoutSeconds) { [weak self]
 			fd, w in
@@ -265,7 +269,7 @@ public class NetTCP {
 	/// - parameter count: The number of bytes to read
 	/// - parameter timeoutSeconds: The number of seconds to wait for the requested number of bytes. A timeout value of negative one indicates that the request should have no timeout.
 	/// - parameter completion: The callback on which the results will be delivered. If the timeout occurs before the requested number of bytes have been read, a nil object will be delivered to the callback.
-	public func readBytesFully(count cnt: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
+	public func readBytesFully(count cnt: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
 
 		let ptr = ReferenceBuffer(size: cnt)
 		readBytesFully(into: ptr, read: 0, remaining: cnt, timeoutSeconds: timeoutSeconds, completion: completion)
@@ -274,7 +278,7 @@ public class NetTCP {
 	/// Read up to the indicated number of bytes and deliver them on the provided callback.
 	/// - parameter count: The maximum number of bytes to read.
 	/// - parameter completion: The callback on which to deliver the results. If an error occurs during the read then a nil object will be passed to the callback, otherwise, the immediately available number of bytes, which may be zero, will be passed.
-	public func readSomeBytes(count cnt: Int, completion: ([UInt8]?) -> ()) {
+	public func readSomeBytes(count cnt: Int, completion: @escaping ([UInt8]?) -> ()) {
 		
 		let readRead = min(cnt, self.reasonableMaxReadCount)
 		let ptr = ReferenceBuffer(size: readRead)
@@ -296,14 +300,14 @@ public class NetTCP {
 	/// Write the string and call the callback with the number of bytes which were written.
 	/// - parameter s: The string to write. The string will be written based on its UTF-8 encoding.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
-	public func write(string strng: String, completion: (Int) -> ()) {
+	public func write(string strng: String, completion: @escaping (Int) -> ()) {
 		write(bytes: [UInt8](strng.utf8), completion: completion)
 	}
 	
 	/// Write the indicated bytes and call the callback with the number of bytes which were written.
 	/// - parameter bytes: The array of UInt8 to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
-	public func write(bytes byts: [UInt8], completion: (Int) -> ()) {
+	public func write(bytes byts: [UInt8], completion: @escaping (Int) -> ()) {
 		write(bytes: byts, dataPosition: 0, length: byts.count, completion: completion)
 	}
 	
@@ -312,7 +316,7 @@ public class NetTCP {
 	public func writeFully(bytes byts: [UInt8]) -> Bool {
 		let length = byts.count
 		var totalSent = 0
-		let ptr = UnsafeMutablePointer<UInt8>(byts)
+		let ptr = UnsafeMutablePointer<UInt8>(mutating: byts)
 		var s: Threading.Event?
 		var what: NetEvent.Filter = .none
 		
@@ -370,13 +374,13 @@ public class NetTCP {
 	/// - parameter dataPosition: The offset within `bytes` at which to begin writing.
 	/// - parameter length: The number of bytes to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
-	public func write(bytes byts: [UInt8], dataPosition: Int, length: Int, completion: (Int) -> ()) {
+	public func write(bytes byts: [UInt8], dataPosition: Int, length: Int, completion: @escaping (Int) -> ()) {
 		
-		let ptr = UnsafeMutablePointer<UInt8>(byts).advanced(by: dataPosition)
+		let ptr = UnsafeMutablePointer<UInt8>(mutating: byts).advanced(by: dataPosition)
 		write(bytes: ptr, wrote: 0, length: length, completion: completion)
 	}
 	
-	func write(bytes byts: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
+	func write(bytes byts: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
         let sent = send(byts, count: length)
 		if isEAgain(err: sent) {
 			writeIncomplete(bytes: byts, wrote: wrote, length: length, completion: completion)
@@ -390,7 +394,7 @@ public class NetTCP {
 		}
 	}
 	
-	func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
+	func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
 		
 		NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 			fd, w in
@@ -405,7 +409,7 @@ public class NetTCP {
 	/// - parameter timeoutSeconds: The number of seconds to wait for the connection to complete. A timeout of negative one indicates that there is no timeout.
 	/// - parameter callBack: The closure which will be called when the connection completes. If the connection completes successfully then the current NetTCP instance will be passed to the callback, otherwise, a nil object will be passed.
 	/// - returns: `PerfectError.NetworkError`
-	public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: (NetTCP?) -> ()) throws {
+	public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: @escaping (NetTCP?) -> ()) throws {
 		
 		initSocket()
 		
@@ -420,12 +424,12 @@ public class NetTCP {
 	#else
 		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
 	#endif
-		memcpy(&sock_addr, &addr, Int(sizeof(sockaddr_in.self)))
+		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
 		
 	#if os(Linux)
 		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
 	#else
-		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
+		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#endif
 		if cRes != -1 {
 			callBack(self)
@@ -448,7 +452,7 @@ public class NetTCP {
 	/// - parameter timeoutSeconds: The number of seconds to wait for a new connection to arrive. A timeout value of negative one indicates that there is no timeout.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
 	/// - returns: `PerfectError.NetworkError`
-	public func accept(timeoutSeconds timeout: Double, callBack: (NetTCP?) -> ()) throws {
+	public func accept(timeoutSeconds timeout: Double, callBack: @escaping (NetTCP?) -> ()) throws {
 	#if os(Linux)
 		let accRes = SwiftGlibc.accept(fd.fd, nil, nil)
 	#else
@@ -485,7 +489,7 @@ public class NetTCP {
 	
 	/// Accept a series of new client connections and pass them to the callback. This function does not return outside of a catastrophic error.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
-	public func forEachAccept(callBack: (NetTCP?) -> ()) {
+	public func forEachAccept(callBack: @escaping (NetTCP?) -> ()) {
 		self.fd.switchToBlocking()
 		repeat {
 			let accRes = tryAccept()

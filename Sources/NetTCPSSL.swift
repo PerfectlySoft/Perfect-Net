@@ -20,7 +20,7 @@
 import OpenSSL
 import PerfectThread
 
-private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutablePointer<Void>?) -> Int32
+private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutableRawPointer?) -> Int32
 
 public class NetTCPSSL : NetTCP {
 
@@ -46,7 +46,7 @@ public class NetTCPSSL : NetTCP {
 		public var publicKeyBytes: [UInt8] {
 			let pk = X509_get_pubkey(self.ptr)
 			let len = Int(i2d_PUBKEY(pk, nil))
-			var mp = UnsafeMutablePointer<UInt8>(nil)
+			var mp = UnsafeMutablePointer<UInt8>(nil as OpaquePointer?)
 
 			i2d_PUBKEY(pk, &mp)
 
@@ -84,23 +84,15 @@ public class NetTCPSSL : NetTCP {
 			if !self.keyFilePassword.isEmpty {
 
 				self.initSocket()
-            #if FLIP
-                let opaqueMe = UnsafeMutablePointer<Void>(OpaquePointer(bitPattern: Unmanaged.passUnretained(self)))
-            #else
                 let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
-            #endif
 				let callback: passwordCallbackFunc = {
 					(buf, size, rwflag, userData) -> Int32 in
 				
 					guard let userDataCheck = userData, let bufCheck = buf else {
 						return 0
 					}
-                    
-                #if FLIP
-                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(OpaquePointer(userDataCheck)).takeUnretainedValue()
-                #else
-                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutablePointer<()>(userDataCheck)).takeUnretainedValue()
-                #endif
+					
+                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
 					return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
 				}
 
@@ -257,7 +249,7 @@ public class NetTCPSSL : NetTCP {
 		return super.isEAgain(err: er)
 	}
 
-	override func recv(into buf: UnsafeMutablePointer<Void>, count: Int) -> Int {
+	override func recv(into buf: UnsafeMutableRawPointer, count: Int) -> Int {
 		if self.usingSSL {
 			let i = Int(SSL_read(self.ssl!, buf, Int32(count)))
 			return i
@@ -265,7 +257,7 @@ public class NetTCPSSL : NetTCP {
 		return super.recv(into: buf, count: count)
 	}
 
-	override func send(_ buf: UnsafePointer<Void>, count: Int) -> Int {
+	override func send(_ buf: UnsafeRawPointer, count: Int) -> Int {
 		if self.usingSSL {
 			let i = Int(SSL_write(self.ssl!, buf, Int32(count)))
 			return i
@@ -273,7 +265,7 @@ public class NetTCPSSL : NetTCP {
 		return super.send(buf, count: count)
 	}
 
-	override func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: ([UInt8]?) -> ()) {
+	override func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
 		guard usingSSL else {
 			return super.readBytesFullyIncomplete(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
 		}
@@ -294,7 +286,7 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
-	override func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: (Int) -> ()) {
+	override func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
 		guard usingSSL else {
 			return super.writeIncomplete(bytes: nptr, wrote: wrote, length: length, completion: completion)
 		}
@@ -323,11 +315,11 @@ public class NetTCPSSL : NetTCP {
 		super.close()
 	}
 
-	public func beginSSL(closure: (Bool) -> ()) {
+	public func beginSSL(closure: @escaping (Bool) -> ()) {
 		self.beginSSL(timeoutSeconds: 5.0, closure: closure)
 	}
 
-	public func beginSSL(timeoutSeconds timeout: Double, closure: (Bool) -> ()) {
+	public func beginSSL(timeoutSeconds timeout: Double, closure: @escaping (Bool) -> ()) {
 		guard self.fd.fd != invalidSocket else {
 			closure(false)
 			return
@@ -470,7 +462,7 @@ public class NetTCPSSL : NetTCP {
 		return NetTCPSSL(fd: fd)
 	}
 
-	override public func forEachAccept(callBack: (NetTCP?) -> ()) {
+	override public func forEachAccept(callBack: @escaping (NetTCP?) -> ()) {
 		super.forEachAccept {
 			[unowned self] (net:NetTCP?) -> () in
 
@@ -487,7 +479,7 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
-	override public func accept(timeoutSeconds timeout: Double, callBack: (NetTCP?) -> ()) throws {
+	override public func accept(timeoutSeconds timeout: Double, callBack: @escaping (NetTCP?) -> ()) throws {
 		try super.accept(timeoutSeconds: timeout, callBack: {
 			[unowned self] (net:NetTCP?) -> () in
 
@@ -504,7 +496,7 @@ public class NetTCPSSL : NetTCP {
 		})
 	}
 
-	func finishAccept(timeoutSeconds timeout: Double, net: NetTCPSSL, callBack: (NetTCP?) -> ()) {
+	func finishAccept(timeoutSeconds timeout: Double, net: NetTCPSSL, callBack: @escaping (NetTCP?) -> ()) {
 		let res = SSL_accept(net.ssl!)
 		let sslErr = SSL_get_error(net.ssl!, res)
 		if res == -1 {

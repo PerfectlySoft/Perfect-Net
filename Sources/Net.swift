@@ -62,9 +62,9 @@ public struct SocketFileDescriptor {
         let _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 	#endif
         var one = Int32(1)
-        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(sizeof(Int32.self)))
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, UInt32(MemoryLayout<Int32>.size))
 	#if os(OSX)
-		setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, UInt32(sizeof(Int32.self)));
+		setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, UInt32(MemoryLayout<Int32>.size));
 	#endif
 	}
     
