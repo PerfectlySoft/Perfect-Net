@@ -200,7 +200,7 @@ public class NetEvent {
 						var filter = Filter.none
 						if (evt.events & EPOLLERR.rawValue) != 0 {
 							var errData = Int32(0)
-							var errLen = socklen_t(sizeof(Int32.self))
+							var errLen = socklen_t(MemoryLayout<Int32>.size)
 							getsockopt(sock, SOL_SOCKET, SO_ERROR, &errData, &errLen)
 							filter = .error(errData)
 						} else if (evt.events & EPOLLIN.rawValue) != 0 {

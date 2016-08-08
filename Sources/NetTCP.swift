@@ -152,7 +152,7 @@ public class NetTCP {
 	#endif
 		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
 	#if os(Linux)
-		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
+		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#else
 		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#endif
@@ -427,7 +427,7 @@ public class NetTCP {
 		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
 		
 	#if os(Linux)
-		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(sizeof(sockaddr_in.self)))
+		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#else
 		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
 	#endif

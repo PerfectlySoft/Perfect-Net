@@ -108,7 +108,7 @@ public class NetNamedPipe : NetTCP {
 	private func makeUNAddr(address addr: String) -> (UnsafeMutablePointer<UInt8>, Int) {
 		let utf8 = addr.utf8
 #if os(Linux) // BSDs have a size identifier in front, Linux does not
-		let addrLen = sizeof(sockaddr_un.self)
+		let addrLen = MemoryLayout<sockaddr_un>.size
 #else
 		let addrLen = MemoryLayout<UInt8>.size + MemoryLayout<sa_family_t>.size + utf8.count + 1
 #endif
