@@ -164,9 +164,9 @@ public class NetTCP {
 	/// Switches the socket to server mode. Socket should have been previously bound using the `bind` function.
 	public func listen(backlog: Int32 = 128) {
 	#if os(Linux)
-		let _ = SwiftGlibc.listen(fd.fd, backlog)
+		_ = SwiftGlibc.listen(fd.fd, backlog)
 	#else
-		let _ = Darwin.listen(fd.fd, backlog)
+		_ = Darwin.listen(fd.fd, backlog)
 	#endif
 	}
 	
@@ -176,12 +176,11 @@ public class NetTCP {
 		if fd.fd != invalidSocket {
 		#if os(Linux)
 			shutdown(fd.fd, 2) // !FIX!
-			let _ = SwiftGlibc.close(fd.fd)
+			_ = SwiftGlibc.close(fd.fd)
 		#else
 			shutdown(fd.fd, SHUT_RDWR)
-			let _ = Darwin.close(fd.fd)
+			_ = Darwin.close(fd.fd)
 		#endif
-			
 			fd.fd = invalidSocket
         }
 	}
@@ -194,11 +193,12 @@ public class NetTCP {
 	#endif
 	}
 	
-	func send(_ buf: UnsafeRawPointer, count: Int) -> Int {
+	func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
+		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
 	#if os(Linux)
-		return SwiftGlibc.send(self.fd.fd, buf, count, 0)
+		return SwiftGlibc.send(self.fd.fd, ptr, count, 0)
 	#else
-		return Darwin.send(self.fd.fd, buf, count, 0)
+		return Darwin.send(self.fd.fd, ptr, count, 0)
 	#endif
 	}
 
@@ -221,7 +221,6 @@ public class NetTCP {
 			}
 			sin.sin_addr.s_addr = inet_addr(host)
 		}
-		
 		return 0
 	}
 	
@@ -308,7 +307,7 @@ public class NetTCP {
 	/// - parameter bytes: The array of UInt8 to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
 	public func write(bytes byts: [UInt8], completion: @escaping (Int) -> ()) {
-		write(bytes: byts, dataPosition: 0, length: byts.count, completion: completion)
+		write(bytes: byts, offsetBy: 0, count: byts.count, completion: completion)
 	}
 	
 	/// Write the indicated bytes and return true if all data was sent.
@@ -316,7 +315,6 @@ public class NetTCP {
 	public func writeFully(bytes byts: [UInt8]) -> Bool {
 		let length = byts.count
 		var totalSent = 0
-		let ptr = UnsafeMutablePointer<UInt8>(mutating: byts)
 		var s: Threading.Event?
 		var what: NetEvent.Filter = .none
 		
@@ -332,7 +330,7 @@ public class NetTCP {
 		
 		while length > 0 {
 			
-			let sent = send(ptr.advanced(by: totalSent), count: length - totalSent)
+			let sent = send(byts, offsetBy: totalSent, count: length - totalSent)
 			if sent == length {
 				return true
 			}
@@ -371,35 +369,27 @@ public class NetTCP {
 			 
 	/// Write the indicated bytes and call the callback with the number of bytes which were written.
 	/// - parameter bytes: The array of UInt8 to write.
-	/// - parameter dataPosition: The offset within `bytes` at which to begin writing.
-	/// - parameter length: The number of bytes to write.
+	/// - parameter offsetBy: The offset within `bytes` at which to begin writing.
+	/// - parameter count: The number of bytes to write.
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
-	public func write(bytes byts: [UInt8], dataPosition: Int, length: Int, completion: @escaping (Int) -> ()) {
-		
-		let ptr = UnsafeMutablePointer<UInt8>(mutating: byts).advanced(by: dataPosition)
-		write(bytes: ptr, wrote: 0, length: length, completion: completion)
-	}
-	
-	func write(bytes byts: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
-        let sent = send(byts, count: length)
+	public func write(bytes: [UInt8], offsetBy: Int, count: Int, completion: @escaping (Int) -> ()) {
+		let sent = send(bytes, offsetBy: offsetBy, count: count)
 		if isEAgain(err: sent) {
-			writeIncomplete(bytes: byts, wrote: wrote, length: length, completion: completion)
+			writeIncomplete(bytes: bytes, offsetBy: offsetBy, count: count, completion: completion)
 		} else if sent == -1 {
 			completion(sent)
-		} else if sent < length {
+		} else if sent < count {
 			// flow control
-			writeIncomplete(bytes: byts.advanced(by: sent), wrote: wrote + sent, length: length - sent, completion: completion)
+			writeIncomplete(bytes: bytes, offsetBy: offsetBy + sent, count: count - sent, completion: completion)
 		} else {
-			completion(wrote + sent)
+			completion(offsetBy + sent)
 		}
 	}
 	
-	func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
-		
+	func writeIncomplete(bytes: [UInt8], offsetBy: Int, count: Int, completion: @escaping (Int) -> ()) {
 		NetEvent.add(socket: fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 			fd, w in
-			
-			self.write(bytes: nptr, wrote: wrote, length: length, completion: completion)
+			self.write(bytes: bytes, offsetBy: offsetBy, count: count, completion: completion)
 		}
 	}
 	

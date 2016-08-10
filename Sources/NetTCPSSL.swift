@@ -257,12 +257,13 @@ public class NetTCPSSL : NetTCP {
 		return super.recv(into: buf, count: count)
 	}
 
-	override func send(_ buf: UnsafeRawPointer, count: Int) -> Int {
+	override func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
+		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
 		if self.usingSSL {
-			let i = Int(SSL_write(self.ssl!, buf, Int32(count)))
+			let i = Int(SSL_write(self.ssl!, ptr, Int32(count)))
 			return i
 		}
-		return super.send(buf, count: count)
+		return super.send(buf, offsetBy: offsetBy, count: count)
 	}
 
 	override func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
@@ -286,9 +287,9 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
-	override func writeIncomplete(bytes nptr: UnsafeMutablePointer<UInt8>, wrote: Int, length: Int, completion: @escaping (Int) -> ()) {
+	override func writeIncomplete(bytes: [UInt8], offsetBy: Int, count: Int, completion: @escaping (Int) -> ()) {
 		guard usingSSL else {
-			return super.writeIncomplete(bytes: nptr, wrote: wrote, length: length, completion: completion)
+			return super.writeIncomplete(bytes: bytes, offsetBy: offsetBy, count: count, completion: completion)
 		}
 		var what = NetEvent.Filter.write
 		let sslErr = SSL_get_error(self.ssl!, -1)
@@ -298,7 +299,7 @@ public class NetTCPSSL : NetTCP {
 
 		NetEvent.add(socket: fd.fd, what: what, timeoutSeconds: NetEvent.noTimeout) { [weak self]
 			fd, w in
-			self?.write(bytes: nptr, wrote: wrote, length: length, completion: completion)
+			self?.write(bytes: bytes, offsetBy: offsetBy, count: count, completion: completion)
 		}
 	}
 
