@@ -49,7 +49,7 @@ func logTerminal(message: String) -> Never  {
 
 public class NetEvent {
 
-	enum Filter {
+	public enum Filter {
 		case none, error(Int32), read, write, timer
 
     #if os(Linux)
@@ -77,7 +77,7 @@ public class NetEvent {
     #endif
 	}
 
-	typealias EventCallback = (SocketType, Filter) -> ()
+	public typealias EventCallback = (SocketType, Filter) -> ()
 	private static let emptyCallback: EventCallback = { _, _ in }
 
 #if os(Linux)
@@ -272,7 +272,7 @@ public class NetEvent {
 	}
 
 	// socket can only be queued with one callback at a time
-	static func add(socket newSocket: SocketType, what: Filter, timeoutSeconds: Double, callback: EventCallback) {
+	public static func add(socket newSocket: SocketType, what: Filter, timeoutSeconds: Double, callback: EventCallback) {
 		
 		NetEvent.initialize()
 		
@@ -340,7 +340,7 @@ public class NetEvent {
 		}
 	}
 
-	static func remove(socket oldSocket: SocketType) {
+	public static func remove(socket oldSocket: SocketType) {
 		if let n = NetEvent.staticEvent {
 			let _ = n.lock.lock()
             defer { let _ = n.lock.unlock() }

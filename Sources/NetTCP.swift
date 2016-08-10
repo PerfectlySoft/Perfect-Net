@@ -49,7 +49,7 @@ public class NetTCP {
 	private var networkFailure: Bool = false
 	private let reasonableMaxReadCount = 1024 * 600 // <700k is imperically the largest chuck I was reading at a go
 	
-	var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
+	public var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
 	
     public var isValid: Bool { return self.fd.isValid }
     

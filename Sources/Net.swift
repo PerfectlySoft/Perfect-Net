@@ -36,15 +36,15 @@ public let invalidSocket = SocketType(-1)
 /// Combines a socket with its family type & provides some utilities required by the LibEvent sub-system.
 public struct SocketFileDescriptor {
 
-	var fd: SocketType, family: Int32
-	var isValid: Bool { return self.fd != invalidSocket }
+	public var fd: SocketType, family: Int32
+	public var isValid: Bool { return self.fd != invalidSocket }
 
-	init(fd: SocketType, family: Int32 = AF_UNSPEC) {
+	public init(fd: SocketType, family: Int32 = AF_UNSPEC) {
 		self.fd = fd
 		self.family = family
 	}
 
-	func switchToNonBlocking() {
+	public func switchToNonBlocking() {
         guard self.fd != invalidSocket else {
             return
         }
@@ -68,7 +68,7 @@ public struct SocketFileDescriptor {
 	#endif
 	}
     
-    func switchToBlocking() {
+    public func switchToBlocking() {
         guard self.fd != invalidSocket else {
             return
         }
