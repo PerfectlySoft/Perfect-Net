@@ -42,7 +42,7 @@ public class NetTCP {
 		}
 		
 		subscript(by: Int) -> UnsafeMutableRawPointer {
-			return UnsafeMutableRawPointer(mutating: UnsafePointer<Void>(self.a).advanced(by: by))
+			return UnsafeMutableRawPointer(mutating: UnsafeRawPointer(self.a).advanced(by: by))
 		}
 	}
 	
