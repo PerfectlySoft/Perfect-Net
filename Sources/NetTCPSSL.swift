@@ -20,6 +20,12 @@
 import OpenSSL
 import PerfectThread
 
+#if os(Linux)
+	import SwiftGlibc
+#else
+	import Darwin
+#endif
+
 private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutableRawPointer?) -> Int32
 
 public class NetTCPSSL : NetTCP {
