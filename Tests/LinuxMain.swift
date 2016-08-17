@@ -1,5 +1,5 @@
 import XCTest
-@testable import PerfectNetTestSuite
+@testable import PerfectNetTests
 
 XCTMain([
      testCase(PerfectNetTests.allTests),
