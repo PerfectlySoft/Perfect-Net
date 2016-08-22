@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 //
 
-import OpenSSL
+import COpenSSL
 import PerfectThread
 
 #if os(Linux)
@@ -39,9 +39,9 @@ public class NetTCPSSL : NetTCP {
 
 	public class X509 {
 
-		private let ptr: UnsafeMutablePointer<OpenSSL.X509>
+		private let ptr: UnsafeMutablePointer<COpenSSL.X509>
 
-		init(ptr: UnsafeMutablePointer<OpenSSL.X509>) {
+		init(ptr: UnsafeMutablePointer<COpenSSL.X509>) {
 			self.ptr = ptr
 		}
 
