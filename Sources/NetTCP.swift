@@ -290,9 +290,7 @@ public class NetTCP {
 			completion(nil)
 		} else {
 			let complete = completeArray(from: ptr, count: readCount)
-			Threading.dispatch {
-				completion(complete)
-			}
+			completion(complete)
 		}
 	}
 	
