@@ -210,7 +210,11 @@ public class NetTCPSSL : NetTCP {
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_SET_ECDH_AUTO, 1, nil)
 	#endif
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_MODE, SSL_MODE_AUTO_RETRY, nil)
-		SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, SSL_OP_ALL, nil)
+        #if arch(arm)
+                SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, Int(bitPattern: SSL_OP_ALL), nil)
+	#else
+                SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, SSL_OP_ALL, nil)
+        #endif
 	}
 
 	public func errorCode() -> UInt {
