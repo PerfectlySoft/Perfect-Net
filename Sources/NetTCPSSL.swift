@@ -28,6 +28,8 @@ import PerfectThread
 
 private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutableRawPointer?) -> Int32
 
+private var openSSLLocks: [Threading.Lock] = []
+
 public class NetTCPSSL : NetTCP {
 
 	public static var opensslVersionText : String {
@@ -78,6 +80,27 @@ public class NetTCPSSL : NetTCP {
         SSL_library_init()
         ERR_load_crypto_strings()
         SSL_load_error_strings()
+		
+		for i in 0..<Int(CRYPTO_num_locks()) {
+			openSSLLocks.append(Threading.Lock())
+		}
+		
+		let lockingCallback: @convention(c) (Int32, Int32, UnsafePointer<Int8>?, Int32) -> () = {
+			(mode:Int32, n:Int32, file:UnsafePointer<Int8>?, line:Int32) in
+			
+			if (mode & CRYPTO_LOCK) != 0 {
+				openSSLLocks[Int(n)].lock()
+			} else {
+				openSSLLocks[Int(n)].unlock()
+			}
+		}
+		CRYPTO_set_locking_callback(lockingCallback)
+		
+		let threadIdCallback: @convention(c) () -> UInt = {
+			return unsafeBitCast(pthread_self(), to: UInt.self)
+		}
+		
+		CRYPTO_set_id_callback(threadIdCallback)
         return true
     }()
 

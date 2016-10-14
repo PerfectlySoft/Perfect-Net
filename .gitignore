@@ -64,3 +64,4 @@ fastlane/screenshots
 
 Packages/
 PerfectNet.xcodeproj/
+.DS_Store
