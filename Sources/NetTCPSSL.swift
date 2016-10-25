@@ -487,6 +487,26 @@ public class NetTCPSSL : NetTCP {
 		let r = SSL_CTX_check_private_key(sslCtx)
 		return r == 1
 	}
+  
+  public func setClientCA(clientCAFilePath: String, verifyMode: Int32) -> Bool {
+    self.initSocket()
+    guard let sslCtx = self.sslCtx else {
+      return false
+    }
+    
+    let oldList = SSL_CTX_get_client_CA_list(sslCtx)
+    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(clientCAFilePath));
+    let newList = SSL_CTX_get_client_CA_list(sslCtx)
+    
+    if
+      let oldNbCAs = oldList?.pointee.stack.num,
+      let newNbCAs = newList?.pointee.stack.num, oldNbCAs + 1 == newNbCAs {
+      
+      SSL_CTX_set_verify(sslCtx, verifyMode, nil)
+      return true
+    }
+    return false
+  }
 
 	override func makeFromFd(_ fd: Int32) -> NetTCP {
 		return NetTCPSSL(fd: fd)
