@@ -30,6 +30,20 @@ private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<In
 
 private var openSSLLocks: [Threading.Lock] = []
 
+public struct OpenSSLVerifyMode: OptionSet {
+  public let rawValue: Int32
+  public init(rawValue: Int32) {
+    self.rawValue = rawValue
+  }
+  public static let sslVerifyNone = OpenSSLVerifyMode(rawValue: SSL_VERIFY_NONE)
+  public static let sslVerifyPeer = OpenSSLVerifyMode(rawValue: SSL_VERIFY_PEER)
+  public static let sslVerifyFailIfNoPeerCert = OpenSSLVerifyMode(rawValue: SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
+  public static let sslVerifyClientOnce = OpenSSLVerifyMode(rawValue: SSL_VERIFY_CLIENT_ONCE)
+  public static let sslVerifyPeerWithFailIfNoPeerCert: OpenSSLVerifyMode = [.sslVerifyPeer, .sslVerifyFailIfNoPeerCert]
+  public static let sslVerifyPeerClientOnce: OpenSSLVerifyMode = [.sslVerifyPeer, .sslVerifyClientOnce]
+  public static let sslVerifyPeerWithFailIfNoPeerCertClientOnce: OpenSSLVerifyMode = [.sslVerifyPeer, .sslVerifyFailIfNoPeerCert, .sslVerifyClientOnce]
+}
+
 public class NetTCPSSL : NetTCP {
 
 	public static var opensslVersionText : String {
@@ -488,21 +502,21 @@ public class NetTCPSSL : NetTCP {
 		return r == 1
 	}
   
-  public func setClientCA(clientCAFilePath: String, verifyMode: Int32) -> Bool {
+  public func setClientCA(path: String, verifyMode: OpenSSLVerifyMode) -> Bool {
     self.initSocket()
     guard let sslCtx = self.sslCtx else {
       return false
     }
     
     let oldList = SSL_CTX_get_client_CA_list(sslCtx)
-    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(clientCAFilePath));
+    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path));
     let newList = SSL_CTX_get_client_CA_list(sslCtx)
     
     if
       let oldNbCAs = oldList?.pointee.stack.num,
       let newNbCAs = newList?.pointee.stack.num, oldNbCAs + 1 == newNbCAs {
       
-      SSL_CTX_set_verify(sslCtx, verifyMode, nil)
+      SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, nil)
       return true
     }
     return false
