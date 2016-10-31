@@ -27,6 +27,7 @@ import PerfectThread
 #endif
 
 private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutableRawPointer?) -> Int32
+public typealias VerifyCACallbackFunc = @convention (c) (Int32, UnsafeMutablePointer<X509_STORE_CTX>?) -> Int32
 
 private var openSSLLocks: [Threading.Lock] = []
 
@@ -520,6 +521,11 @@ public class NetTCPSSL : NetTCP {
       return true
     }
     return false
+  }
+  
+  public func subscribeCAVerify(verifyMode: OpenSSLVerifyMode,
+                                callback: @escaping VerifyCACallbackFunc) {
+    SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, callback)
   }
 
 	override func makeFromFd(_ fd: Int32) -> NetTCP {
