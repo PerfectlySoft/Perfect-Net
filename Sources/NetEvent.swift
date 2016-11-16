@@ -131,7 +131,7 @@ public class NetEvent {
         var rlmt = rlimit()
     #if os(Linux)
         getrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
-        rlmt.rlim_cur = rlim_t(10240)
+        rlmt.rlim_cur = rlmt.rlim_max
         setrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
     #else
         getrlimit(RLIMIT_NOFILE, &rlmt)
