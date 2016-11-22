@@ -45,6 +45,12 @@ public struct OpenSSLVerifyMode: OptionSet {
   public static let sslVerifyPeerWithFailIfNoPeerCertClientOnce: OpenSSLVerifyMode = [.sslVerifyPeer, .sslVerifyFailIfNoPeerCert, .sslVerifyClientOnce]
 }
 
+public enum TLSMethod {
+	case tlsV1_2
+	case tlsV1_1
+	case tlsV1
+}
+
 public class NetTCPSSL : NetTCP {
 
 	public static var opensslVersionText : String {
@@ -123,6 +129,8 @@ public class NetTCPSSL : NetTCP {
 	private var sslCtx: UnsafeMutablePointer<SSL_CTX>?
 	private var ssl: UnsafeMutablePointer<SSL>?
 
+	public var tlsMethod: TLSMethod = .tlsV1_2
+
 	public var keyFilePassword: String = "" {
 		didSet {
 			if !self.keyFilePassword.isEmpty {
@@ -136,7 +144,7 @@ public class NetTCPSSL : NetTCP {
 						return 0
 					}
 					
-                    let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
+					let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
 					return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
 				}
 
@@ -235,7 +243,13 @@ public class NetTCPSSL : NetTCP {
 		guard self.sslCtx == nil else {
 			return
 		}
-		self.sslCtx = SSL_CTX_new(TLSv1_2_method())
+
+		switch self.tlsMethod {
+		case .tlsV1_2: self.sslCtx = SSL_CTX_new(TLSv1_2_method())
+		case .tlsV1_1: self.sslCtx = SSL_CTX_new(TLSv1_1_method())
+		case .tlsV1: self.sslCtx = SSL_CTX_new(TLSv1_method())
+		}
+		
 		guard let sslCtx = self.sslCtx else {
 			return
 		}
