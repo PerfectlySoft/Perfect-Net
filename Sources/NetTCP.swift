@@ -23,7 +23,8 @@ import PerfectThread
 import SwiftGlibc
 let AF_UNSPEC: Int32 = 0
 let AF_INET: Int32 = 2
-let INADDR_NONE = UInt32(0xffffffff)
+let INADDR_CONST: UInt64 = 0xffffffff
+let INADDR_NONE = UInt32(truncatingBitPattern: INADDR_CONST)
 let EINPROGRESS = Int32(115)
 #else
 import Darwin
