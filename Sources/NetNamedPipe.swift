@@ -38,15 +38,15 @@ public class NetNamedPipe : NetTCP {
 	}
 
 	/// Override socket initialization to handle the UNIX socket type.
-	public override func initSocket() {
-	#if os(Linux)
-		fd.fd = socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
-	#else
-		fd.fd = socket(AF_UNIX, SOCK_STREAM, 0)
-	#endif
-		fd.family = AF_UNIX
-		fd.switchToNonBlocking()
-	}
+//	public override func initSocket() {
+//	#if os(Linux)
+//		fd.fd = socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
+//	#else
+//		fd.fd = socket(AF_UNIX, SOCK_STREAM, 0)
+//	#endif
+//		fd.family = AF_UNIX
+//		fd.switchToNonBlocking()
+//	}
 
 	public override func sockName() -> (String, UInt16) {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
@@ -144,7 +144,7 @@ public class NetNamedPipe : NetTCP {
 	/// - throws: `PerfectError.NetworkError`
 	public func bind(address addr: String) throws {
 
-		initSocket()
+		initSocket(family: AF_UNIX)
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
 		defer { addrPtr.deallocate(capacity: addrLen) }
@@ -170,7 +170,7 @@ public class NetNamedPipe : NetTCP {
 	/// - returns: `PerfectError.NetworkError`
 	public func connect(address addr: String, timeoutSeconds: Double, callBack: @escaping (NetNamedPipe?) -> ()) throws {
 
-		initSocket()
+		initSocket(family: AF_UNIX)
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
 		defer { addrPtr.deallocate(capacity: addrLen) }

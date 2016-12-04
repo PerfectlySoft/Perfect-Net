@@ -2,6 +2,8 @@ import XCTest
 @testable import PerfectNet
 import PerfectThread
 
+let localhost = "::"//"127.0.0.1"
+
 class PerfectNetTests: XCTestCase {
     
     override func setUp() {
@@ -13,7 +15,7 @@ class PerfectNetTests: XCTestCase {
         do {
             let server = NetTCP()
             let client = NetTCP()
-            try server.bind(port: port, address: "127.0.0.1")
+            try server.bind(port: port, address: localhost)
             server.listen()
             let serverExpectation = self.expectation(description: "server")
             let clientExpectation = self.expectation(description: "client")
@@ -38,7 +40,7 @@ class PerfectNetTests: XCTestCase {
                 }
             }
             
-            try client.connect(address: "127.0.0.1", port: port, timeoutSeconds: 5) {
+            try client.connect(address: localhost, port: port, timeoutSeconds: 5) {
                 (inn: NetTCP?) -> () in
                 guard let n = inn else {
                     XCTAssertNotNil(inn)
@@ -75,7 +77,7 @@ class PerfectNetTests: XCTestCase {
         do {
             let server = NetTCP()
             let client = NetTCP()
-            try server.bind(port: port, address: "127.0.0.1")
+            try server.bind(port: port, address: localhost)
             server.listen()
             let serverExpectation = self.expectation(description: "server")
             let clientExpectation = self.expectation(description: "client")
@@ -89,7 +91,7 @@ class PerfectNetTests: XCTestCase {
                 serverExpectation.fulfill()
             }
             var once = false
-            try client.connect(address: "127.0.0.1", port: port, timeoutSeconds: 5) {
+            try client.connect(address: localhost, port: port, timeoutSeconds: 5) {
                 (inn: NetTCP?) -> () in
                 guard let n = inn else {
                     XCTAssertNotNil(inn)
@@ -184,7 +186,45 @@ class PerfectNetTests: XCTestCase {
 			net.close()
 		}
     }
-    
+	
+	func testMakeAddress() {
+		let net = NetTCP()
+		var addr = sockaddr_storage()
+		do {
+			let r = net.makeAddress(&addr, host: "localhost", port: 80)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+		}
+		do {
+			let r = net.makeAddress(&addr, host: "127.0.0.1", port: 80)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET))
+		}
+		do {
+			let r = net.makeAddress(&addr, host: "0.0.0.0", port: 80, binding: true)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET))
+		}
+		
+		do {
+			let r = net.makeAddress(&addr, host: "www.google.com", port: 80)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+		}
+		
+		do {
+			let r = net.makeAddress(&addr, host: "www.perfect.org", port: 80)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET6) || addr.ss_family == UInt8(AF_INET))
+		}
+		
+		do {
+			let r = net.makeAddress(&addr, host: "::", port: 80, binding: true)
+			XCTAssert(r == 0)
+			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+		}
+	}
+	
     static var allTests : [(String, (PerfectNetTests) -> () throws -> Void)] {
         return [
             ("testClientServer", testClientServer),

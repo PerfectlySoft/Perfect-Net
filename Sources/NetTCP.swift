@@ -29,6 +29,29 @@ let EINPROGRESS = Int32(115)
 import Darwin
 #endif
 
+#if os(Linux)
+	extension sockaddr_storage {
+		var ss_len: Int8 {
+			switch Int32(self.ss_family) {
+			case AF_INET:
+				return Int8(MemoryLayout<sockaddr_in>.size)
+			case AF_INET6:
+				return Int8(MemoryLayout<sockaddr_in6>.size)
+			case AF_UNIX:
+				return Int8(MemoryLayout<sockaddr_un>.size)
+			default:
+				return Int8(MemoryLayout<sockaddr>.size)
+			}
+		}
+	}
+	
+	extension addrinfo {
+		init(ai_flags: Int32, ai_family: Int32, ai_socktype: __socket_type, ai_protocol: Int32, ai_addrlen: socklen_t, ai_canonname: UnsafeMutablePointer<Int8>!, ai_addr: UnsafeMutablePointer<sockaddr>!, ai_next: UnsafeMutablePointer<addrinfo>!) {
+			self.init(ai_flags: ai_flags, ai_family: ai_family, ai_socktype: Int32(ai_socktype.rawValue), ai_protocol: ai_protocol, ai_addrlen: ai_addrlen, ai_addr: ai_addr, ai_canonname: ai_canonname, ai_next: ai_next)
+		}
+	}
+#endif
+
 /// Provides an asynchronous IO wrapper around a file descriptor.
 /// Fully realized for TCP socket types but can also serve as a base for sockets from other families, such as with `NetNamedPipe`/AF_UNIX.
 public class NetTCP {
@@ -47,7 +70,7 @@ public class NetTCP {
 	}
 	
 	private var networkFailure: Bool = false
-	private let reasonableMaxReadCount = 1024 * 600 // <700k is imperically the largest chuck I was reading at a go
+	private let reasonableMaxReadCount = 1024 * 600 // <700k is emperically the largest chuck I was reading at a go
 	
 	public var fd: SocketFileDescriptor = SocketFileDescriptor(fd: invalidSocket, family: AF_UNSPEC)
 	
@@ -71,60 +94,86 @@ public class NetTCP {
 	/// The functions `bind` and `connect` will call this method to ensure the socket has been allocated.
 	/// Sub-classes should override this function in order to create their specialized socket.
 	/// All sub-class sockets should be switched to utilize non-blocking IO by calling `SocketFileDescriptor.switchToNBIO()`.
-	public func initSocket() {
+	public func initSocket(family: Int32) {
 		if fd.fd == invalidSocket {
 		#if os(Linux)
-			fd.fd = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
+			fd.fd = socket(family, Int32(SOCK_STREAM.rawValue), 0)
 		#else
-			fd.fd = socket(AF_INET, SOCK_STREAM, 0)
+			fd.fd = socket(family, SOCK_STREAM, 0)
 		#endif
-			fd.family = AF_INET
+			fd.family = family
 			fd.switchToNonBlocking()
 		}
 	}
 	
 	public func sockName() -> (String, UInt16) {
-		let staticBufferSize = 1024
-		var addr = UnsafeMutablePointer<sockaddr_in>.allocate(capacity: 1)
-		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
+		let staticBufferSize = Int(INET6_ADDRSTRLEN)
+		var addr = sockaddr_storage()
+		var addrPtr = UnsafeMutablePointer(&addr)
+		var len = socklen_t(MemoryLayout<sockaddr_storage>.size)
 		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
+		var port: in_port_t = 0
 		defer {
-			addr.deallocate(capacity: 1)
-			len.deallocate(capacity: 1)
 			buffer.deallocate(capacity: staticBufferSize)
 		}
-		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
-		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			getsockname(fd.fd, $0, len)
+		let result: Int32 = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			p in
+			getsockname(fd.fd, p, &len)
 		}
-		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
-		
+		guard result == 0 else {
+			return ("", 0)
+		}
+		switch Int32(addr.ss_family) {
+		case AF_INET:
+			_ = addrPtr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+				inet_ntop(fd.family, &$0.pointee.sin_addr, buffer, len)
+				port = $0.pointee.sin_port.netToHost
+			}
+		case AF_INET6:
+			_ = addrPtr.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+				inet_ntop(fd.family, &$0.pointee.sin6_addr, buffer, len)
+				port = $0.pointee.sin6_port.netToHost
+			}
+		default:
+			()
+		}
 		let s = String(validatingUTF8: buffer) ?? ""
-		let p = addr.pointee.sin_port.netToHost
-		
-		return (s, p)
+		return (s, port)
 	}
 	
 	public func peerName() -> (String, UInt16) {
-		let staticBufferSize = 1024
-		var addr = UnsafeMutablePointer<sockaddr_in>.allocate(capacity: 1)
-		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
+		let staticBufferSize = Int(INET6_ADDRSTRLEN)
+		var addr = sockaddr_storage()
+		var addrPtr = UnsafeMutablePointer(&addr)
+		var len = socklen_t(MemoryLayout<sockaddr_storage>.size)
 		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
+		var port: in_port_t = 0
 		defer {
-			addr.deallocate(capacity: 1)
-			len.deallocate(capacity: 1)
 			buffer.deallocate(capacity: staticBufferSize)
 		}
-		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
-		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			getpeername(fd.fd, $0, len)
+		let result: Int32 = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			p in
+			getpeername(fd.fd, p, &len)
 		}
-		inet_ntop(fd.family, &addr.pointee.sin_addr, buffer, len.pointee)
-		
+		guard result == 0 else {
+			return ("", 0)
+		}
+		switch Int32(addr.ss_family) {
+		case AF_INET:
+			_ = addrPtr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+				inet_ntop(fd.family, &$0.pointee.sin_addr, buffer, len)
+				port = $0.pointee.sin_port.netToHost
+			}
+		case AF_INET6:
+			_ = addrPtr.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+				inet_ntop(fd.family, &$0.pointee.sin6_addr, buffer, len)
+				port = $0.pointee.sin6_port.netToHost
+			}
+		default:
+			()
+		}
 		let s = String(validatingUTF8: buffer) ?? ""
-		let p = addr.pointee.sin_port.netToHost
-		
-		return (s, p)
+		return (s, port)
 	}
 	
 	func isEAgain(err er: Int) -> Bool {
@@ -136,26 +185,20 @@ public class NetTCP {
 	/// - parameter address: The the local address, given as a string, on which to bind. Defaults to "0.0.0.0".
 	/// - throws: PerfectError.NetworkError
 	public func bind(port prt: UInt16, address: String = "0.0.0.0") throws {
-		
-		initSocket()
-		
-		var addr: sockaddr_in = sockaddr_in()
-		let res = makeAddress(&addr, host: address, port: prt)
+		var addr = sockaddr_storage()
+		let res = makeAddress(&addr, host: address, port: prt, binding: true)
 		guard res != -1 else {
 			try ThrowNetworkError()
 		}
-		let i0 = Int8(0)
-	#if os(Linux)
-		var sock_addr = sockaddr(sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
-	#else
-		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
-	#endif
-		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
-	#if os(Linux)
-		let bRes = SwiftGlibc.bind(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
-	#else
-		let bRes = Darwin.bind(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
-	#endif
+		initSocket(family: Int32(addr.ss_family))
+		let bRes: Int32 = UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			saddr in
+			#if os(Linux)
+				return SwiftGlibc.bind(self.fd.fd, saddr, socklen_t(addr.ss_len))
+			#else
+				return Darwin.bind(self.fd.fd, saddr, socklen_t(addr.ss_len))
+			#endif
+		}
 		if bRes == -1 {
 			try ThrowNetworkError()
 		}
@@ -201,25 +244,48 @@ public class NetTCP {
 		return Darwin.send(self.fd.fd, ptr, count, 0)
 	#endif
 	}
-
-	private func makeAddress(_ sin: inout sockaddr_in, host: String, port: UInt16) -> Int {
-		
+	
+	func makeAddress(_ sin: inout sockaddr_storage, host: String, port: UInt16, binding: Bool = false) -> Int {
+		let aiFlags: Int32 = 0
+		let family: Int32 = AF_UNSPEC
 		let bPort = port.bigEndian
-		sin.sin_port = in_port_t(bPort)
-		sin.sin_family = sa_family_t(AF_INET)
-		
-		defer {
-			endhostent()
+		var hints = addrinfo(ai_flags: aiFlags, ai_family: family, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+		var resultList = UnsafeMutablePointer<addrinfo>(bitPattern: 0)
+		var result = getaddrinfo(host, nil, &hints, &resultList)
+		while EAI_AGAIN == result {
+			Threading.sleep(seconds: 0.1)
+			result = getaddrinfo(host, nil, &hints, &resultList)
 		}
-		
-		if let theHost: UnsafeMutablePointer<hostent> = gethostbyname(host), let firstAddress = theHost.pointee.h_addr_list.pointee {
-			sin.sin_addr.s_addr = UnsafeMutableRawPointer(firstAddress).assumingMemoryBound(to: UInt32.self).pointee
-		} else {
-			if inet_addr(host) == INADDR_NONE {
-				endhostent()
+		if result == EAI_NONAME {
+			hints = addrinfo(ai_flags: aiFlags, ai_family: AF_INET6, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+			result = getaddrinfo(host, nil, &hints, &resultList)
+		}
+		if result == 0, var resultList = resultList {
+			defer {
+				freeaddrinfo(resultList)
+			}
+			guard let addr = resultList.pointee.ai_addr else {
 				return -1
 			}
-			sin.sin_addr.s_addr = inet_addr(host)
+			switch Int32(addr.pointee.sa_family) {
+			case AF_INET6:
+				memcpy(&sin, addr, MemoryLayout<sockaddr_in6>.size)
+				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+					$0.pointee.sin6_port = in_port_t(bPort)
+				}
+			case AF_INET:
+				memcpy(&sin, addr, MemoryLayout<sockaddr_in>.size)
+				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+					$0.pointee.sin_port = in_port_t(bPort)
+				}
+			default:
+				return -1
+			}
+		} else {
+			
+			print("Result: \(result)")
+			
+			return -1
 		}
 		return 0
 	}
@@ -398,27 +464,29 @@ public class NetTCP {
 	/// - parameter callBack: The closure which will be called when the connection completes. If the connection completes successfully then the current NetTCP instance will be passed to the callback, otherwise, a nil object will be passed.
 	/// - returns: `PerfectError.NetworkError`
 	public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: @escaping (NetTCP?) -> ()) throws {
-		
-		initSocket()
-		
-		var addr: sockaddr_in = sockaddr_in()
+		var addr = sockaddr_storage()
 		let res = makeAddress(&addr, host: addrs, port: port)
 		guard res != -1 else {
 			try ThrowNetworkError()
 		}
-		let i0 = Int8(0)
-	#if os(Linux)
-		var sock_addr = sockaddr(sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
-	#else
-		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
-	#endif
-		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
+		initSocket(family: Int32(addr.ss_family))
 		
-	#if os(Linux)
-		let cRes = SwiftGlibc.connect(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
-	#else
-		let cRes = Darwin.connect(fd.fd, &sock_addr, socklen_t(MemoryLayout<sockaddr_in>.size))
-	#endif
+//		let i0 = Int8(0)
+//	#if os(Linux)
+//		var sock_addr = sockaddr(sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
+//	#else
+//		var sock_addr = sockaddr(sa_len: 0, sa_family: 0, sa_data: (i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0, i0))
+//	#endif
+//		memcpy(&sock_addr, &addr, Int(MemoryLayout<sockaddr_in>.size))
+		
+		let cRes: Int32 = UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) {
+			saddr in
+		#if os(Linux)
+			return SwiftGlibc.connect(self.fd.fd, saddr, socklen_t(addr.ss_len))
+		#else
+			return Darwin.connect(self.fd.fd, saddr, socklen_t(addr.ss_len))
+		#endif
+		}
 		if cRes != -1 {
 			callBack(self)
 		} else {

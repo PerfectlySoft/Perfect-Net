@@ -238,8 +238,12 @@ public class NetTCPSSL : NetTCP {
 		return Int32(chars.count)
 	}
 
-	override public func initSocket() {
-		super.initSocket()
+	func initSocket() {
+		initSocket(family: AF_INET)
+	}
+	
+	override public func initSocket(family: Int32) {
+		super.initSocket(family: family)
 		guard self.sslCtx == nil else {
 			return
 		}
