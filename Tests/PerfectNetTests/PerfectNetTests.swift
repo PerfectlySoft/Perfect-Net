@@ -127,13 +127,12 @@ class PerfectNetTests: XCTestCase {
         let requestCount = requestString.count
 		let clientExpectation = self.expectation(description: "client")
         let net = NetTCPSSL()
-        let setOk = net.setDefaultVerifyPaths()
-        XCTAssert(setOk, "Unable to setDefaultVerifyPaths \(net.sslErrorCode(resultCode: 1))")
         do {
             try net.connect(address: address, port: 443, timeoutSeconds: 5.0) {
                 net in
                 if let ssl = net as? NetTCPSSL {
-                    
+					let setOk = ssl.setDefaultVerifyPaths()
+					XCTAssert(setOk, "Unable to setDefaultVerifyPaths \(ssl.sslErrorCode(resultCode: 1))")
                     ssl.beginSSL {
                         (success: Bool) in
                         

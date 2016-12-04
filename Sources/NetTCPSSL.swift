@@ -133,24 +133,7 @@ public class NetTCPSSL : NetTCP {
 
 	public var keyFilePassword: String = "" {
 		didSet {
-			if !self.keyFilePassword.isEmpty {
-
-				self.initSocket()
-                let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
-				let callback: passwordCallbackFunc = {
-					(buf, size, rwflag, userData) -> Int32 in
-				
-					guard let userDataCheck = userData, let bufCheck = buf else {
-						return 0
-					}
-					
-					let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
-					return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
-				}
-
-				SSL_CTX_set_default_passwd_cb_userdata(self.sslCtx!, opaqueMe)
-				SSL_CTX_set_default_passwd_cb(self.sslCtx!, callback)
-			}
+			
 		}
 	}
 
@@ -221,7 +204,7 @@ public class NetTCPSSL : NetTCP {
 
 		_ = NetTCPSSL.initOnce
 	}
-
+	
 	deinit {
 		if let ssl = self.ssl {
 			SSL_shutdown(ssl)
@@ -236,10 +219,6 @@ public class NetTCPSSL : NetTCP {
 		let chars = self.keyFilePassword.utf8
 		memmove(buf, self.keyFilePassword, chars.count + 1)
 		return Int32(chars.count)
-	}
-
-	func initSocket() {
-		initSocket(family: AF_INET)
 	}
 	
 	override public func initSocket(family: Int32) {
@@ -267,6 +246,23 @@ public class NetTCPSSL : NetTCP {
 	#endif
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_MODE, SSL_MODE_AUTO_RETRY, nil)
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, SSL_OP_ALL, nil)
+		
+		if !keyFilePassword.isEmpty {
+			let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
+			let callback: passwordCallbackFunc = {
+				(buf, size, rwflag, userData) -> Int32 in
+				
+				guard let userDataCheck = userData, let bufCheck = buf else {
+					return 0
+				}
+				
+				let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
+				return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
+			}
+			
+			SSL_CTX_set_default_passwd_cb_userdata(self.sslCtx!, opaqueMe)
+			SSL_CTX_set_default_passwd_cb(self.sslCtx!, callback)
+		}
 	}
 
 	public func errorCode() -> UInt {
@@ -468,7 +464,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func setDefaultVerifyPaths() -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -477,7 +472,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func setVerifyLocations(caFilePath: String, caDirPath: String) -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -486,7 +480,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func useCertificateFile(cert: String) -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -495,7 +488,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func useCertificateChainFile(cert crt: String) -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -504,7 +496,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func usePrivateKeyFile(cert crt: String) -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -513,7 +504,6 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	public func checkPrivateKey() -> Bool {
-		self.initSocket()
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
@@ -522,7 +512,6 @@ public class NetTCPSSL : NetTCP {
 	}
   
   public func setClientCA(path: String, verifyMode: OpenSSLVerifyMode) -> Bool {
-    self.initSocket()
     guard let sslCtx = self.sslCtx else {
       return false
     }

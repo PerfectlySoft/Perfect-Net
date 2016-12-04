@@ -90,6 +90,11 @@ public class NetTCP {
 		self.fd.switchToNonBlocking()
 	}
 	
+	@available(*, deprecated, message: "Call bind() or connect() to init socket")
+	public func initSocket() {
+		self.initSocket(family: AF_INET)
+	}
+	
 	/// Allocates a new socket if it has not already been done.
 	/// The functions `bind` and `connect` will call this method to ensure the socket has been allocated.
 	/// Sub-classes should override this function in order to create their specialized socket.
