@@ -196,35 +196,35 @@ class PerfectNetTests: XCTestCase {
 		do {
 			let r = net.makeAddress(&addr, host: "localhost", port: 80)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
 		}
 		do {
 			let r = net.makeAddress(&addr, host: "127.0.0.1", port: 80)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET))
 		}
 		do {
 			let r = net.makeAddress(&addr, host: "0.0.0.0", port: 80, binding: true)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET))
 		}
 		
 		do {
 			let r = net.makeAddress(&addr, host: "www.google.com", port: 80)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
 		}
 		
 		do {
 			let r = net.makeAddress(&addr, host: "www.perfect.org", port: 80)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET6) || addr.ss_family == UInt8(AF_INET))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET6) || addr.ss_family == sa_family_t(AF_INET))
 		}
 		
 		do {
 			let r = net.makeAddress(&addr, host: "::", port: 80, binding: true)
 			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == UInt8(AF_INET6))
+			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
 		}
 	}
 	
