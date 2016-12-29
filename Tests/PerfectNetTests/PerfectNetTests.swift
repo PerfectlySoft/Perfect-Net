@@ -2,6 +2,10 @@ import XCTest
 @testable import PerfectNet
 import PerfectThread
 
+#if os(Linux)
+	import SwiftGlibc
+#endif
+
 let localhost = "::"//"127.0.0.1"
 
 class PerfectNetTests: XCTestCase {
