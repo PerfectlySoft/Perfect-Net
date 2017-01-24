@@ -37,17 +37,6 @@ public class NetNamedPipe : NetTCP {
 		self.fd.switchToNonBlocking()
 	}
 
-	/// Override socket initialization to handle the UNIX socket type.
-//	public override func initSocket() {
-//	#if os(Linux)
-//		fd.fd = socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
-//	#else
-//		fd.fd = socket(AF_UNIX, SOCK_STREAM, 0)
-//	#endif
-//		fd.family = AF_UNIX
-//		fd.switchToNonBlocking()
-//	}
-
 	public override func sockName() -> (String, UInt16) {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
 		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)

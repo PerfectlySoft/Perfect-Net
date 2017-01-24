@@ -191,40 +191,122 @@ class PerfectNetTests: XCTestCase {
     }
 	
 	func testMakeAddress() {
-		let net = NetTCP()
-		var addr = sockaddr_storage()
 		do {
-			let r = net.makeAddress(&addr, host: "localhost", port: 80)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
+			let r = NetAddress(host: "localhost", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6))
 		}
 		do {
-			let r = net.makeAddress(&addr, host: "127.0.0.1", port: 80)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET))
+			let r = NetAddress(host: "127.0.0.1", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET))
 		}
 		do {
-			let r = net.makeAddress(&addr, host: "0.0.0.0", port: 80, binding: true)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET))
+			let r = NetAddress(host: "0.0.0.0", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET))
 		}
 		
 		do {
-			let r = net.makeAddress(&addr, host: "www.google.com", port: 80)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
+			let r = NetAddress(host: "www.google.com", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6) || r?.addr.ss_family == sa_family_t(AF_INET))
 		}
 		
 		do {
-			let r = net.makeAddress(&addr, host: "www.perfect.org", port: 80)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET6) || addr.ss_family == sa_family_t(AF_INET))
+			let r = NetAddress(host: "www.perfect.org", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6) || r?.addr.ss_family == sa_family_t(AF_INET))
 		}
 		
 		do {
-			let r = net.makeAddress(&addr, host: "::", port: 80, binding: true)
-			XCTAssert(r == 0)
-			XCTAssert(addr.ss_family == sa_family_t(AF_INET6))
+			let r = NetAddress(host: "::", port: 80)
+			XCTAssert(r != nil)
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6))
+		}
+	}
+	
+	func testUDPClientServer() {
+		let listenPort = UInt16(8979)
+		let client = NetUDP()
+		let server = NetUDP()
+		let clientExpectation = self.expectation(description: "client")
+		let serverExpectation = self.expectation(description: "server")
+		
+		Threading.dispatch {
+			do {
+				try server.bind(port: listenPort, address: "0.0.0.0")
+				server.listen()
+				
+				let loops = 2048
+				
+				Threading.dispatch {
+					func loop(counter: Int) {
+						guard counter != loops else {
+							return serverExpectation.fulfill()
+						}
+						server.readBytes(count: counter+1, timeoutSeconds: 60.0) {
+							f in
+							do {
+								guard let (bytes, _) = try f() else {
+									XCTAssert(false, "Nil response")
+									return serverExpectation.fulfill()
+								}
+								XCTAssert(bytes.count == counter+1)
+//								print("read \(bytes.count)")
+								Threading.dispatch {
+									loop(counter: counter+1)
+								}
+							} catch {
+								XCTAssert(false, "\(error)")
+								return serverExpectation.fulfill()
+							}
+						}
+					}
+					loop(counter: 0)
+				}
+				
+				Threading.dispatch {
+					guard let address = NetAddress(host: "0.0.0.0", port: listenPort, type: .udp) else {
+						XCTAssert(false, "Could not make address")
+						return clientExpectation.fulfill()
+					}
+					
+					func loop(counter: Int) {
+						guard counter != loops else {
+							return clientExpectation.fulfill()
+						}
+						
+						let bytesToWrite = [UInt8](repeating: 1, count: counter+1)
+						client.write(bytes: bytesToWrite, to: address, timeoutSeconds: 60.0) {
+							f in
+							do {
+								let (wrote, _) = try f()
+								XCTAssert(wrote == counter+1)
+//								print("wrote \(wrote)")
+								Threading.dispatch {
+									Threading.sleep(seconds: 0.01)
+									loop(counter: counter+1)
+								}
+							} catch {
+								XCTAssert(false, "\(error)")
+								return clientExpectation.fulfill()
+							}
+						}
+					}
+					loop(counter: 0)
+				}
+			} catch {
+				XCTAssert(false, "\(error)")
+				clientExpectation.fulfill()
+				serverExpectation.fulfill()
+			}
+		}
+		
+		self.waitForExpectations(timeout: 10000) {
+			_ in
+			client.close()
+			server.close()
 		}
 	}
 	
@@ -232,7 +314,23 @@ class PerfectNetTests: XCTestCase {
         return [
             ("testClientServer", testClientServer),
             ("testClientServerReadTimeout", testClientServerReadTimeout),
-            ("testTCPSSLClient", testTCPSSLClient)            
+            ("testTCPSSLClient", testTCPSSLClient),
+            ("testMakeAddress", testMakeAddress),
+            ("testUDPClientServer", testUDPClientServer)
         ]
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
