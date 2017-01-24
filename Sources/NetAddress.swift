@@ -35,9 +35,9 @@ public enum NetSockType {
 }
 
 public struct NetAddress {
-	let host: String
-	let port: UInt16
-	let addr: sockaddr_storage
+	public let host: String
+	public let port: UInt16
+	public let addr: sockaddr_storage
 	
 	public init?(addr: sockaddr_storage) {
 		var addr = addr
