@@ -178,6 +178,8 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
+	public var initializedCallback: ((NetTCPSSL) -> ())?
+	
 	public func setTmpDH(path: String) -> Bool {
 		guard let ctx = self.sslCtx else {
 			return false
@@ -247,6 +249,8 @@ public class NetTCPSSL : NetTCP {
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_MODE, SSL_MODE_AUTO_RETRY, nil)
 		SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, SSL_OP_ALL, nil)
 		
+		initializedCallback?(self)
+		
 		if !keyFilePassword.isEmpty {
 			let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
 			let callback: passwordCallbackFunc = {
@@ -255,11 +259,9 @@ public class NetTCPSSL : NetTCP {
 				guard let userDataCheck = userData, let bufCheck = buf else {
 					return 0
 				}
-				
 				let crl = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
 				return crl.passwordCallback(bufCheck, size: size, rwflag: rwflag)
 			}
-			
 			SSL_CTX_set_default_passwd_cb_userdata(self.sslCtx!, opaqueMe)
 			SSL_CTX_set_default_passwd_cb(self.sslCtx!, callback)
 		}
