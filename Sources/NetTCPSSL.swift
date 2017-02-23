@@ -203,20 +203,9 @@ public class NetTCPSSL : NetTCP {
 
 	public override init() {
 		super.init()
-
 		_ = NetTCPSSL.initOnce
 	}
 	
-	deinit {
-		if let ssl = self.ssl {
-			SSL_shutdown(ssl)
-			SSL_free(ssl)
-		}
-		if let sslCtx = self.sslCtx, self.sharedSSLCtx == false {
-			SSL_CTX_free(sslCtx)
-		}
-	}
-
 	func passwordCallback(_ buf:UnsafeMutablePointer<Int8>, size:Int32, rwflag:Int32) -> Int32 {
 		let chars = self.keyFilePassword.utf8
 		memmove(buf, self.keyFilePassword, chars.count + 1)
