@@ -486,11 +486,33 @@ public class NetTCPSSL : NetTCP {
 		return r == 1
 	}
 
+	public func useCertificateChain(cert crt: String) -> Bool {
+		guard let sslCtx = self.sslCtx else {
+			return false
+		}
+		let bio = BIO_new(BIO_s_mem());
+		BIO_puts(bio, crt);
+		let certificate = PEM_read_bio_X509(bio, nil, nil, nil);
+		let r = SSL_CTX_use_certificate(sslCtx, certificate)
+		return r == 1
+	}
+
 	public func usePrivateKeyFile(cert crt: String) -> Bool {
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
 		let r = SSL_CTX_use_PrivateKey_file(sslCtx, crt, SSL_FILETYPE_PEM)
+		return r == 1
+	}
+
+	public func usePrivateKey(cert crt: String) -> Bool {
+		guard let sslCtx = self.sslCtx else {
+			return false
+		}
+		let bio = BIO_new(BIO_s_mem());
+		BIO_puts(bio, crt);
+		let pKey = PEM_read_bio_PrivateKey(bio, nil, nil, nil)
+		let r = SSL_CTX_use_PrivateKey(sslCtx, pKey)
 		return r == 1
 	}
 
