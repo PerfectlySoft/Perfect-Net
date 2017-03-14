@@ -229,9 +229,6 @@ open class Net {
 				return -1
 			}
 		} else {
-			
-			print("Result: \(result)")
-			
 			return -1
 		}
 		return 0

@@ -18,7 +18,7 @@
 //
 
 import COpenSSL
-import PerfectThread
+import PerfectCrypto
 
 #if os(Linux)
 	import SwiftGlibc
@@ -28,8 +28,6 @@ import PerfectThread
 
 private typealias passwordCallbackFunc = @convention(c) (UnsafeMutablePointer<Int8>?, Int32, Int32, UnsafeMutableRawPointer?) -> Int32
 public typealias VerifyCACallbackFunc = @convention (c) (Int32, UnsafeMutablePointer<X509_STORE_CTX>?) -> Int32
-
-private var openSSLLocks: [Threading.Lock] = []
 
 public struct OpenSSLVerifyMode: OptionSet {
   public let rawValue: Int32
@@ -98,30 +96,12 @@ public class NetTCPSSL : NetTCP {
 	}
 
     static var initOnce: Bool = {
+		guard PerfectCrypto.isInitialized else {
+			return false
+		}
         SSL_library_init()
         ERR_load_crypto_strings()
         SSL_load_error_strings()
-		
-		for i in 0..<Int(CRYPTO_num_locks()) {
-			openSSLLocks.append(Threading.Lock())
-		}
-		
-		let lockingCallback: @convention(c) (Int32, Int32, UnsafePointer<Int8>?, Int32) -> () = {
-			(mode:Int32, n:Int32, file:UnsafePointer<Int8>?, line:Int32) in
-			
-			if (mode & CRYPTO_LOCK) != 0 {
-				openSSLLocks[Int(n)].lock()
-			} else {
-				openSSLLocks[Int(n)].unlock()
-			}
-		}
-		CRYPTO_set_locking_callback(lockingCallback)
-		
-		let threadIdCallback: @convention(c) () -> UInt = {
-			return unsafeBitCast(pthread_self(), to: UInt.self)
-		}
-		
-		CRYPTO_set_id_callback(threadIdCallback)
         return true
     }()
 
@@ -181,19 +161,20 @@ public class NetTCPSSL : NetTCP {
 	public var initializedCallback: ((NetTCPSSL) -> ())?
 	
 	public func setTmpDH(path: String) -> Bool {
-		guard let ctx = self.sslCtx else {
+		guard let ctx = self.sslCtx,
+			let bio = BIO_new_file(path, "r") else {
 			return false
 		}
-
-		let bio = BIO_new_file(path, "r")
-		if bio == nil {
+		defer {
+			BIO_free(bio)
+		}
+		guard let dh = PEM_read_bio_DHparams(bio, nil, nil, nil) else {
 			return false
 		}
-
-		let dh = PEM_read_bio_DHparams(bio, nil, nil, nil)
+		defer {
+			DH_free(dh)
+		}
 		SSL_CTX_ctrl(ctx, SSL_CTRL_SET_TMP_DH, 0, dh)
-		DH_free(dh)
-		BIO_free(bio)
 		return true
 	}
 
@@ -490,9 +471,12 @@ public class NetTCPSSL : NetTCP {
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
-		let bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, crt);
-		let certificate = PEM_read_bio_X509(bio, nil, nil, nil);
+		let bio = BIO_new(BIO_s_mem())
+		defer {
+			BIO_free(bio)
+		}
+		BIO_puts(bio, crt)
+		let certificate = PEM_read_bio_X509(bio, nil, nil, nil)
 		let r = SSL_CTX_use_certificate(sslCtx, certificate)
 		return r == 1
 	}
@@ -505,12 +489,16 @@ public class NetTCPSSL : NetTCP {
 		return r == 1
 	}
 
+	/// Use a stringified version of the certificate.
 	public func usePrivateKey(cert crt: String) -> Bool {
 		guard let sslCtx = self.sslCtx else {
 			return false
 		}
-		let bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, crt);
+		let bio = BIO_new(BIO_s_mem())
+		defer {
+			BIO_free(bio)
+		}
+		BIO_puts(bio, crt)
 		let pKey = PEM_read_bio_PrivateKey(bio, nil, nil, nil)
 		let r = SSL_CTX_use_PrivateKey(sslCtx, pKey)
 		return r == 1
@@ -530,7 +518,7 @@ public class NetTCPSSL : NetTCP {
     }
     
     let oldList = SSL_CTX_get_client_CA_list(sslCtx)
-    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path));
+    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path))
     let newList = SSL_CTX_get_client_CA_list(sslCtx)
     
     if
