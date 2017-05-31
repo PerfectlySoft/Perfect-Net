@@ -47,8 +47,6 @@ public enum TLSMethod {
 	case tlsV1
 	case tlsV1_1
 	case tlsV1_2
-	case sslV23
-	case sslV3
 }
 
 public class NetTCPSSL : NetTCP {
@@ -205,8 +203,6 @@ public class NetTCPSSL : NetTCP {
 		case .tlsV1_2: self.sslCtx = SSL_CTX_new(TLSv1_2_method())
 		case .tlsV1_1: self.sslCtx = SSL_CTX_new(TLSv1_1_method())
 		case .tlsV1: self.sslCtx = SSL_CTX_new(TLSv1_method())
-		case .sslV23: self.sslCtx = SSL_CTX_new(SSLv23_method())
-		case .sslV3: self.sslCtx = SSL_CTX_new(SSLv3_method())
 		}
 		
 		guard let sslCtx = self.sslCtx else {
