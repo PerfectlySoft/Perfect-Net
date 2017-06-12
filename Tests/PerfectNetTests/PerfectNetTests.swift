@@ -6,7 +6,7 @@ import PerfectThread
 	import SwiftGlibc
 #endif
 
-let localhost = "::"//"127.0.0.1"
+let localhost = "127.0.0.1"
 
 class PerfectNetTests: XCTestCase {
     
@@ -15,7 +15,7 @@ class PerfectNetTests: XCTestCase {
     }
 	
     func testClientServer() {
-        let port = UInt16(6500)
+        let port = UInt16(6501)
         do {
             let server = NetTCP()
             let client = NetTCP()
@@ -194,7 +194,7 @@ class PerfectNetTests: XCTestCase {
 		do {
 			let r = NetAddress(host: "localhost", port: 80)
 			XCTAssert(r != nil)
-			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6))
+			XCTAssert(r?.addr.ss_family == sa_family_t(AF_INET6) || r?.addr.ss_family == sa_family_t(AF_INET))
 		}
 		do {
 			let r = NetAddress(host: "127.0.0.1", port: 80)
