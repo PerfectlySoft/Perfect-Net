@@ -417,10 +417,11 @@ public class NetTCPSSL : NetTCP {
 		}
 	}
 
-	public func shutdown() {
+	override public func shutdown() {
 		if let ssl = self.ssl {
 			SSL_shutdown(ssl)
 		}
+		super.shutdown()
 	}
 
 	public func setConnectState() {

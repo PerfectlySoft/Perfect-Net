@@ -180,6 +180,16 @@ open class Net {
 	
 	open func initSocket(family: Int32) {}
 	
+	open func shutdown() {
+		if fd.fd != invalidSocket {
+			#if os(Linux)
+			_ = SwiftGlibc.shutdown(fd.fd, Int32(SHUT_RDWR))
+			#else
+			_ = Darwin.shutdown(fd.fd, SHUT_RDWR)
+			#endif
+		}
+	}
+	
 	/// Allocates a new socket if it has not already been done.
 	/// The functions `bind` and `connect` will call this method to ensure the socket has been allocated.
 	/// Sub-classes should override this function in order to create their specialized socket.
@@ -276,12 +286,11 @@ open class Net {
 	/// The object may be reused.
 	public func close() {
 		if fd.fd != invalidSocket {
+			shutdown()
 			#if os(Linux)
-				shutdown(fd.fd, 2) // !FIX!
-				_ = SwiftGlibc.close(fd.fd)
+			_ = SwiftGlibc.close(fd.fd)
 			#else
-				shutdown(fd.fd, SHUT_RDWR)
-				_ = Darwin.close(fd.fd)
+			_ = Darwin.close(fd.fd)
 			#endif
 			fd.fd = invalidSocket
 		}
