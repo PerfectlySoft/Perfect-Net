@@ -156,13 +156,18 @@ public class NetEvent {
 		q.dispatch {
 			while true {
 
-			#if os(Linux)
-				let nev = Int(epoll_wait(self.kq, self.evlist, Int32(self.numEvents), -1))
-			#else
-				let nev = Int(kevent(self.kq, nil, 0, self.evlist, Int32(self.numEvents), nil))
-			#endif
-				guard nev >= 0 else {
-					logTerminal(message: "event returned less than zero \(nev).")
+				#if os(Linux)
+					var nev = Int(epoll_wait(self.kq, self.evlist, Int32(self.numEvents), -1))
+				#else
+					var nev = Int(kevent(self.kq, nil, 0, self.evlist, Int32(self.numEvents), nil))
+				#endif
+				
+				if nev == -1 {
+					if errno == EINTR {
+						nev = 0
+					} else {
+						logTerminal(message: "event returned less than zero \(nev) \(errno).")
+					}
 				}
 
 				// process results
