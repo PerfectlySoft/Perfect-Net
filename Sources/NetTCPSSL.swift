@@ -106,11 +106,16 @@ public class NetTCPSSL : NetTCP {
     }()
 
 	private var sharedSSLCtx = true
-	private var sslCtx: UnsafeMutablePointer<SSL_CTX>?
-	private var ssl: UnsafeMutablePointer<SSL>?
+	fileprivate var sslCtx: UnsafeMutablePointer<SSL_CTX>?
+	fileprivate var ssl: UnsafeMutablePointer<SSL>?
 
 	public var tlsMethod: TLSMethod = .tlsV1_2
-
+	
+	fileprivate var alpnBuffer: [UInt8]?
+	/// If ALPN is used, this will be the negotiated protocol for this accepted socket.
+	/// This will be nil if ALPN is not enabled OR if the client and server share no common protocols.
+	public var alpnNegotiated: String?
+	
 	public var keyFilePassword: String = "" {
 		didSet {
 			
@@ -513,29 +518,29 @@ public class NetTCPSSL : NetTCP {
 		return r == 1
 	}
   
-  public func setClientCA(path: String, verifyMode: OpenSSLVerifyMode) -> Bool {
-    guard let sslCtx = self.sslCtx else {
-      return false
-    }
-    
-    let oldList = SSL_CTX_get_client_CA_list(sslCtx)
-    SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path))
-    let newList = SSL_CTX_get_client_CA_list(sslCtx)
-    
-    if
-      let oldNbCAs = oldList?.pointee.stack.num,
-      let newNbCAs = newList?.pointee.stack.num, oldNbCAs + 1 == newNbCAs {
-      
-      SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, nil)
-      return true
-    }
-    return false
-  }
-  
-  public func subscribeCAVerify(verifyMode: OpenSSLVerifyMode,
-                                callback: @escaping VerifyCACallbackFunc) {
-    SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, callback)
-  }
+	public func setClientCA(path: String, verifyMode: OpenSSLVerifyMode) -> Bool {
+		guard let sslCtx = self.sslCtx else {
+			return false
+		}
+
+		let oldList = SSL_CTX_get_client_CA_list(sslCtx)
+		SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path))
+		let newList = SSL_CTX_get_client_CA_list(sslCtx)
+
+		if
+			let oldNbCAs = oldList?.pointee.stack.num,
+			let newNbCAs = newList?.pointee.stack.num, oldNbCAs + 1 == newNbCAs {
+
+			SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, nil)
+			return true
+		}
+		return false
+	}
+
+	public func subscribeCAVerify(verifyMode: OpenSSLVerifyMode,
+							callback: @escaping VerifyCACallbackFunc) {
+		SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, callback)
+	}
 
 	override func makeFromFd(_ fd: Int32) -> NetTCP {
 		return NetTCPSSL(fd: fd)
@@ -550,7 +555,8 @@ public class NetTCPSSL : NetTCP {
 				netSSL.sslCtx = self.sslCtx
 				netSSL.ssl = SSL_new(self.sslCtx!)
 				SSL_set_fd(netSSL.ssl!, netSSL.fd.fd)
-
+				netSSL.alpnBuffer = self.alpnBuffer
+				netSSL.enableALPN()
 				self.finishAccept(timeoutSeconds: -1, net: netSSL, callBack: callBack)
 			} else {
 				callBack(net)
@@ -567,7 +573,8 @@ public class NetTCPSSL : NetTCP {
 				netSSL.sslCtx = self.sslCtx
 				netSSL.ssl = SSL_new(self.sslCtx!)
 				SSL_set_fd(netSSL.ssl!, netSSL.fd.fd)
-
+				netSSL.alpnBuffer = self.alpnBuffer
+				netSSL.enableALPN()
 				self.finishAccept(timeoutSeconds: timeout, net: netSSL, callBack: callBack)
 			} else {
 				callBack(net)
@@ -610,21 +617,71 @@ public class NetTCPSSL : NetTCP {
 			callBack(net)
 		}
 	}
-
-//	private func throwSSLNetworkError(err: Int32) throws {
-//		if err != 0 {
-//			let maxLen = 1024
-//			let buf = UnsafeMutablePointer<Int8>.allocatingCapacity(maxLen)
-//			defer {
-//				buf.destroy() ; buf.dealloc(maxLen)
-//			}
-//			ERR_error_string_n(self.sslErrorCode, buf, maxLen)
-//			let msg = String(validatingUTF8: buf) ?? ""
-//
-//			print("SSL NetworkError: \(err) \(msg)")
-//
-//			throw PerfectError.NetworkError(err, msg)
-//		}
-//	}
-
 }
+
+extension NetTCPSSL {
+	/// Given a list of protocol names, such as h2, http/1.1, this will enable ALPN protocol selection.
+	/// The name of the server+client matched protocol will be available in the `.alpnNegotiated` property.
+	/// This protocol list can be set on the server socket. Accepted sockets will have the `.alpnNegotiated` set.
+	public func enableALPN(protocols: [String]) {
+		let buffer: [UInt8] = protocols.map { Array($0.utf8) }
+			.map { [UInt8($0.count)] + $0 }
+			.reduce([], +)
+		
+		alpnBuffer = buffer
+		enableALPN()
+	}
+	
+	func enableALPN() {
+		guard let ctx = self.sslCtx else {
+			return
+		}
+		typealias alpnSelectCallbackFunc = @convention(c) (UnsafeMutablePointer<SSL>?, UnsafeMutablePointer<UnsafePointer<UInt8>?>?, UnsafeMutablePointer<UInt8>?, UnsafePointer<UInt8>?, UInt32, UnsafeMutableRawPointer?) -> Int32
+		let callback: alpnSelectCallbackFunc = {
+				(ssl: UnsafeMutablePointer<SSL>?,
+				outBuf: UnsafeMutablePointer<UnsafePointer<UInt8>?>?,
+				outLen: UnsafeMutablePointer<UInt8>?,
+				clientBuf: UnsafePointer<UInt8>?,
+				clientLen: UInt32,
+				userData: UnsafeMutableRawPointer?) -> Int32 in
+			
+			guard let userDataCheck = userData else {
+				return OPENSSL_NPN_NO_OVERLAP
+			}
+			
+			let itsame = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
+			
+			guard let serverBuf = itsame.alpnBuffer,
+					let clientBuf = clientBuf,
+					let outBuf = outBuf else {
+				return OPENSSL_NPN_NO_OVERLAP
+			}
+			
+			let serverLen = UInt32(serverBuf.count)
+			return outBuf.withMemoryRebound(to: UnsafeMutablePointer<UInt8>?.self, capacity: 1) {
+				outBuf in
+				let result = SSL_select_next_proto(outBuf, outLen,
+				                                   serverBuf, serverLen,
+				                                   clientBuf, clientLen)
+				if result == OPENSSL_NPN_NEGOTIATED, let chars = outBuf.pointee, let len = outLen?.pointee {
+					var selectedChars = [UInt8]()
+					for n in 0..<Int(len) {
+						selectedChars.append(chars[n])
+					}
+					let negotiated = String(validatingUTF8: selectedChars)
+					itsame.alpnNegotiated = negotiated
+				}
+				return result
+			}
+		}
+		let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
+		SSL_CTX_set_alpn_select_cb(ctx, callback, opaqueMe)
+	}
+}
+
+
+
+
+
+
+
