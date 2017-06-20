@@ -545,6 +545,27 @@ public class NetTCPSSL : NetTCP {
 	override func makeFromFd(_ fd: Int32) -> NetTCP {
 		return NetTCPSSL(fd: fd)
 	}
+	
+	override public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: @escaping (NetTCP?) -> ()) throws {
+		setDefaultVerifyPaths()
+		try super.connect(address: addrs, port: port, timeoutSeconds: timeoutSeconds) {
+			net in
+			guard let netSSL = net as? NetTCPSSL else {
+				return callBack(net)
+			}
+			netSSL.beginSSL {
+				success in
+				guard success else {
+					netSSL.close()
+					return callBack(nil)
+				}
+				if nil != netSSL.alpnBuffer {
+					netSSL.finalizeALPNClient()
+				}
+				callBack(netSSL)
+			}
+		}
+	}
 
 	override public func forEachAccept(callBack: @escaping (NetTCP?) -> ()) {
 		super.forEachAccept {
@@ -622,7 +643,8 @@ public class NetTCPSSL : NetTCP {
 extension NetTCPSSL {
 	/// Given a list of protocol names, such as h2, http/1.1, this will enable ALPN protocol selection.
 	/// The name of the server+client matched protocol will be available in the `.alpnNegotiated` property.
-	/// This protocol list can be set on the server socket. Accepted sockets will have the `.alpnNegotiated` set.
+	/// This protocol list can be set on the server or client socket. Accepted/connected sockets 
+	/// will have `.alpnNegotiated` set to the negotiated protocol.
 	public func enableALPN(protocols: [String]) {
 		let buffer: [UInt8] = protocols.map { Array($0.utf8) }
 			.map { [UInt8($0.count)] + $0 }
@@ -633,17 +655,22 @@ extension NetTCPSSL {
 	}
 	
 	func enableALPN() {
+		enableALPNServer()
+		enableALPNClient()
+	}
+	
+	func enableALPNServer() {
 		guard let ctx = self.sslCtx else {
 			return
 		}
 		typealias alpnSelectCallbackFunc = @convention(c) (UnsafeMutablePointer<SSL>?, UnsafeMutablePointer<UnsafePointer<UInt8>?>?, UnsafeMutablePointer<UInt8>?, UnsafePointer<UInt8>?, UInt32, UnsafeMutableRawPointer?) -> Int32
 		let callback: alpnSelectCallbackFunc = {
-				(ssl: UnsafeMutablePointer<SSL>?,
-				outBuf: UnsafeMutablePointer<UnsafePointer<UInt8>?>?,
-				outLen: UnsafeMutablePointer<UInt8>?,
-				clientBuf: UnsafePointer<UInt8>?,
-				clientLen: UInt32,
-				userData: UnsafeMutableRawPointer?) -> Int32 in
+			(ssl: UnsafeMutablePointer<SSL>?,
+			outBuf: UnsafeMutablePointer<UnsafePointer<UInt8>?>?,
+			outLen: UnsafeMutablePointer<UInt8>?,
+			clientBuf: UnsafePointer<UInt8>?,
+			clientLen: UInt32,
+			userData: UnsafeMutableRawPointer?) -> Int32 in
 			
 			guard let userDataCheck = userData else {
 				return OPENSSL_NPN_NO_OVERLAP
@@ -652,9 +679,9 @@ extension NetTCPSSL {
 			let itsame = Unmanaged<NetTCPSSL>.fromOpaque(UnsafeMutableRawPointer(userDataCheck)).takeUnretainedValue()
 			
 			guard let serverBuf = itsame.alpnBuffer,
-					let clientBuf = clientBuf,
-					let outBuf = outBuf else {
-				return OPENSSL_NPN_NO_OVERLAP
+				let clientBuf = clientBuf,
+				let outBuf = outBuf else {
+					return OPENSSL_NPN_NO_OVERLAP
 			}
 			
 			let serverLen = UInt32(serverBuf.count)
@@ -676,6 +703,27 @@ extension NetTCPSSL {
 		}
 		let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
 		SSL_CTX_set_alpn_select_cb(ctx, callback, opaqueMe)
+	}
+	
+	func enableALPNClient() {
+		guard let ctx = self.sslCtx, let clientBuf = alpnBuffer else {
+			return
+		}
+		SSL_CTX_set_alpn_protos(ctx, clientBuf, UInt32(clientBuf.count))
+	}
+	
+	func finalizeALPNClient() {
+		var ptr: UnsafePointer<UInt8>?  = nil
+		var len: UInt32 = 0
+		SSL_get0_alpn_selected(ssl, &ptr, &len)
+		if len > 0, let ptr = ptr {
+			var selectedChars = [UInt8]()
+			for n in 0..<Int(len) {
+				selectedChars.append(ptr[n])
+			}
+			let negotiated = String(validatingUTF8: selectedChars)
+			self.alpnNegotiated = negotiated
+		}
 	}
 }
 
