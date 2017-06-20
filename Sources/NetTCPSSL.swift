@@ -547,7 +547,7 @@ public class NetTCPSSL : NetTCP {
 	}
 	
 	override public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: @escaping (NetTCP?) -> ()) throws {
-		setDefaultVerifyPaths()
+		_ = setDefaultVerifyPaths()
 		try super.connect(address: addrs, port: port, timeoutSeconds: timeoutSeconds) {
 			net in
 			guard let netSSL = net as? NetTCPSSL else {
