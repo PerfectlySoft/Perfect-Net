@@ -132,50 +132,38 @@ class PerfectNetTests: XCTestCase {
 		let clientExpectation = self.expectation(description: "client")
         let net = NetTCPSSL()
         do {
-            try net.connect(address: address, port: 443, timeoutSeconds: 5.0) {
+			try net.connect(address: address, port: 443, timeoutSeconds: 5.0) {
                 net in
                 if let ssl = net as? NetTCPSSL {
-					let setOk = ssl.setDefaultVerifyPaths()
-					XCTAssert(setOk, "Unable to setDefaultVerifyPaths \(ssl.sslErrorCode(resultCode: 1))")
-                    ssl.beginSSL {
-                        (success: Bool) in
-                        
-                        XCTAssert(success, "Unable to begin SSL \(ssl.errorStr(forCode: Int32(ssl.errorCode())))")
-                        if !success {
-                            clientExpectation.fulfill()
-                            return
-                        }
-                        
-                        do {
-                            let x509 = ssl.peerCertificate
-                            XCTAssert(x509 != nil)
-                            let peerKey = x509?.publicKeyBytes
-                            XCTAssert(peerKey != nil && peerKey!.count > 0)
-                        }
-                        
-                        ssl.write(bytes: requestString) {
-                            sent in
-                            XCTAssert(sent == requestCount)
-                            ssl.readBytesFully(count: 1, timeoutSeconds: 5.0) {
-                                readBytes in
-                                XCTAssert(readBytes != nil && readBytes!.count > 0)
-                                var readBytesCpy = readBytes!
-                                readBytesCpy.append(0)
-                                let ptr = UnsafeRawPointer(readBytesCpy)
-                                let s1 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
-                                ssl.readSomeBytes(count: 4096) {
-                                    readBytes in
-                                    XCTAssert(readBytes != nil && readBytes!.count > 0)
-                                    var readBytesCpy = readBytes!
-									readBytesCpy.append(0)
-									let ptr = UnsafeRawPointer(readBytesCpy)
-									let s2 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
-                                    let s = s1 + s2
-                                    XCTAssert(s.characters.starts(with: "HTTP/1.1 200 OK".characters))
-                                    clientExpectation.fulfill()
-                                }
-                            }
-                        }
+					do {
+						let x509 = ssl.peerCertificate
+						XCTAssert(x509 != nil)
+						let peerKey = x509?.publicKeyBytes
+						XCTAssert(peerKey != nil && peerKey!.count > 0)
+					}
+					
+					ssl.write(bytes: requestString) {
+						sent in
+						XCTAssert(sent == requestCount)
+						ssl.readBytesFully(count: 1, timeoutSeconds: 5.0) {
+							readBytes in
+							XCTAssert(readBytes != nil && readBytes!.count > 0)
+							var readBytesCpy = readBytes!
+							readBytesCpy.append(0)
+							let ptr = UnsafeRawPointer(readBytesCpy)
+							let s1 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
+							ssl.readSomeBytes(count: 4096) {
+								readBytes in
+								XCTAssert(readBytes != nil && readBytes!.count > 0)
+								var readBytesCpy = readBytes!
+								readBytesCpy.append(0)
+								let ptr = UnsafeRawPointer(readBytesCpy)
+								let s2 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
+								let s = s1 + s2
+								XCTAssert(s.characters.starts(with: "HTTP/1.1 200 OK".characters))
+								clientExpectation.fulfill()
+							}
+						}
                     }
                 } else {
                     XCTAssert(false, "Did not get NetTCPSSL back after connect")
