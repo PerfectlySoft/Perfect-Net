@@ -697,8 +697,9 @@ extension NetTCPSSL {
 					}
 					let negotiated = String(validatingUTF8: selectedChars)
 					itsame.alpnNegotiated = negotiated
+					return SSL_TLSEXT_ERR_OK
 				}
-				return result
+				return SSL_TLSEXT_ERR_NOACK
 			}
 		}
 		let opaqueMe = Unmanaged.passUnretained(self).toOpaque()
