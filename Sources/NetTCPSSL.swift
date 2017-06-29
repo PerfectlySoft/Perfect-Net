@@ -797,6 +797,9 @@ extension NetTCPSSL {
 			if let fndCtx = parent.sniContextMap[serverName] {
 				SSL_set_SSL_CTX(ssl, fndCtx.sslCtx)
 				child.trackCtx = fndCtx
+			} else if let fndCtx = parent.sniContextMap["*"] {
+				SSL_set_SSL_CTX(ssl, fndCtx.sslCtx)
+				child.trackCtx = fndCtx
 			}
 			return 1
 		}
