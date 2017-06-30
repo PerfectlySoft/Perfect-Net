@@ -227,11 +227,9 @@ class PerfectNetTests: XCTestCase {
 		
 		Threading.dispatch {
 			do {
-				try server.bind(port: listenPort, address: "0.0.0.0")
+				try server.bind(port: listenPort, address: "127.0.0.1")
 				server.listen()
-				
 				let loops = 2048
-				
 				Threading.dispatch {
 					func loop(counter: Int) {
 						guard counter != loops else {
@@ -241,7 +239,7 @@ class PerfectNetTests: XCTestCase {
 							f in
 							do {
 								guard let (bytes, _) = try f() else {
-									XCTAssert(false, "Nil response")
+									XCTAssert(false, "Nil response \(counter)")
 									return serverExpectation.fulfill()
 								}
 								XCTAssert(bytes.count == counter+1)
@@ -257,25 +255,21 @@ class PerfectNetTests: XCTestCase {
 					}
 					loop(counter: 0)
 				}
-				
 				Threading.dispatch {
 					guard let address = NetAddress(host: "127.0.0.1", port: listenPort, type: .udp) else {
 						XCTAssert(false, "Could not make address")
 						return clientExpectation.fulfill()
 					}
-					
 					func loop(counter: Int) {
 						guard counter != loops else {
 							return clientExpectation.fulfill()
 						}
-						
 						let bytesToWrite = [UInt8](repeating: 1, count: counter+1)
 						client.write(bytes: bytesToWrite, to: address, timeoutSeconds: 60.0) {
 							f in
 							do {
 								let (wrote, _) = try f()
 								XCTAssert(wrote == counter+1)
-//								print("wrote \(wrote)")
 								Threading.dispatch {
 									Threading.sleep(seconds: 0.01)
 									loop(counter: counter+1)

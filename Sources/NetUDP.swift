@@ -106,7 +106,7 @@ public class NetUDP: Net {
 			let err = errno
 			completion({
 				let msg = String(validatingUTF8: strerror(err))!
-				throw PerfectNetError.networkError(err, msg + " \(#file) \(#function) \(#line)")
+				throw PerfectNetError.networkError(err, msg + " \(sent) \(#file) \(#function) \(#line)")
 			})
 		}
 	}
