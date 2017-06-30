@@ -259,7 +259,7 @@ class PerfectNetTests: XCTestCase {
 				}
 				
 				Threading.dispatch {
-					guard let address = NetAddress(host: "0.0.0.0", port: listenPort, type: .udp) else {
+					guard let address = NetAddress(host: "127.0.0.1", port: listenPort, type: .udp) else {
 						XCTAssert(false, "Could not make address")
 						return clientExpectation.fulfill()
 					}
