@@ -43,7 +43,8 @@ class PerfectNetTests: XCTestCase {
                     }
                 }
             }
-            
+			
+			Threading.sleep(seconds: 1.0)
             try client.connect(address: localhost, port: port, timeoutSeconds: 5) {
                 (inn: NetTCP?) -> () in
                 guard let n = inn else {
@@ -94,7 +95,8 @@ class PerfectNetTests: XCTestCase {
                 Threading.sleep(seconds: 5)
                 serverExpectation.fulfill()
             }
-            var once = false
+			var once = false
+			Threading.sleep(seconds: 1.0)
             try client.connect(address: localhost, port: port, timeoutSeconds: 5) {
                 (inn: NetTCP?) -> () in
                 guard let n = inn else {
