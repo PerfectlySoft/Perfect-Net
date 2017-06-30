@@ -17,31 +17,34 @@ class PerfectNetTests: XCTestCase {
     func testClientServer() {
         let port = UInt16(6501)
         do {
+			let b: [UInt8] = [1, 2, 3, 4, 5]
             let server = NetTCP()
+			var serverAccept: NetTCP?
             let client = NetTCP()
             try server.bind(port: port, address: localhost)
             server.listen()
             let serverExpectation = self.expectation(description: "server")
             let clientExpectation = self.expectation(description: "client")
             try server.accept(timeoutSeconds: NetEvent.noTimeout) {
-                (inn: NetTCP?) -> () in
+                inn in
+				serverAccept = inn
                 guard let n = inn else {
                     XCTAssertNotNil(inn)
                     return
                 }
-                let b = [UInt8(1)]
-                do {
-                    n.write(bytes: b) {
-                        sent in
-                        XCTAssertTrue(sent == 1)
-                        n.readBytesFully(count: 1, timeoutSeconds: 5.0) {
-                            read in
-                            XCTAssert(read != nil)
-                            XCTAssert(read?.count == 1)
-                        }
-                        serverExpectation.fulfill()
-                    }
-                }
+				n.write(bytes: b) {
+					sent in
+					XCTAssertTrue(sent == b.count)
+					n.readBytesFully(count: b.count, timeoutSeconds: 5.0) {
+						read in
+						XCTAssert(read != nil)
+						XCTAssert(read?.count == b.count)
+						if let _ = serverAccept {
+							serverAccept = nil
+						}
+						serverExpectation.fulfill()
+					}
+				}
             }
 			
 			Threading.sleep(seconds: 1.0)
@@ -51,25 +54,24 @@ class PerfectNetTests: XCTestCase {
                     XCTAssertNotNil(inn)
                     return
                 }
-                let b = [UInt8(1)]
-                do {
-                    n.readBytesFully(count: 1, timeoutSeconds: 5.0) {
-                        read in
-                        XCTAssert(read != nil)
-                        XCTAssert(read!.count == 1)
-                        n.write(bytes: b) {
-                            sent in
-                            XCTAssertTrue(sent == 1)
-                            clientExpectation.fulfill()
-                        }
-                    }
-                }
+				n.readBytesFully(count: b.count, timeoutSeconds: 5.0) {
+					read in
+					XCTAssert(read != nil)
+					XCTAssert(read!.count == b.count)
+					n.write(bytes: b) {
+						sent in
+						XCTAssertTrue(sent == b.count)
+						Threading.sleep(seconds: 1.0)
+						n.shutdown()
+						clientExpectation.fulfill()
+					}
+				}
             }
-			self.waitForExpectations(timeout: 10000, handler: {
+			self.waitForExpectations(timeout: 10) {
 				_ in
 				server.close()
 				client.close()
-			})
+			}
         } catch PerfectNetError.networkError(let code, let msg) {
             XCTAssert(false, "Exception: \(code) \(msg)")
         } catch let e {
