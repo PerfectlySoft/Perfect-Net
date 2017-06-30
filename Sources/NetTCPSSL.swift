@@ -709,13 +709,14 @@ extension NetTCPSSL {
 		guard let ctx = getCtx(forHost: forHost)?.sslCtx, !buffer.isEmpty else {
 			return
 		}
-		let ptr = CRYPTO_malloc(Int32(buffer.count), #file, #line)
-		memcpy(ptr, buffer, buffer.count)
-		SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferIndex, ptr)
-		SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferSizeIndex, UnsafeMutableRawPointer(bitPattern: buffer.count))
-		
-		enableALPNServer(forHost: forHost)
-		SSL_CTX_set_alpn_protos(ctx, ptr?.assumingMemoryBound(to: UInt8.self), UInt32(buffer.count))
+		if let ptr = CRYPTO_malloc(Int32(buffer.count), #file, #line) {
+			memcpy(ptr, buffer, buffer.count)
+			SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferIndex, ptr)
+			SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferSizeIndex, UnsafeMutableRawPointer(bitPattern: buffer.count))
+			
+			enableALPNServer(forHost: forHost)
+			SSL_CTX_set_alpn_protos(ctx, ptr.assumingMemoryBound(to: UInt8.self), UInt32(buffer.count))
+		}
 	}
 	
 	func enableALPNServer(forHost: String? = nil) {
