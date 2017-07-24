@@ -298,7 +298,11 @@ open class Net {
 	
 }
 
-
+extension Net: Equatable {
+	public static func == (lhs: Net, rhs: Net) -> Bool {
+		return lhs.fd.fd == rhs.fd.fd
+	}
+}
 
 
 
