@@ -24,9 +24,9 @@ let package = Package(
     name: "PerfectNet",
     targets: [],
     dependencies: [
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 1),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-LinuxBridge.git", majorVersion: 2),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 2)
+        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 3),
+        .Package(url: "https://github.com/PerfectlySoft/Perfect-LinuxBridge.git", majorVersion: 3),
+        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 3)
     ],
     exclude: []
 )
@@ -35,8 +35,8 @@ let package = Package(
     name: "PerfectNet",
     targets: [],
     dependencies: [
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 1),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 2)
+        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 3),
+        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 3)
     ],
     exclude: []
 )
