@@ -73,9 +73,9 @@ class PerfectNetTests: XCTestCase {
 				client.close()
 			}
         } catch PerfectNetError.networkError(let code, let msg) {
-            XCTAssert(false, "Exception: \(code) \(msg)")
+            XCTFail("Exception: \(code) \(msg)")
         } catch let e {
-            XCTAssert(false, "Exception: \(e)")
+            XCTFail("Exception: \(e)")
         }
     }
 
@@ -108,7 +108,7 @@ class PerfectNetTests: XCTestCase {
                 do {
                     n.readBytesFully(count: 1, timeoutSeconds: 2.0) {
                         read in
-                        XCTAssert(read == nil)
+                        XCTAssert(read?.isEmpty ?? false)
                         XCTAssert(once == false)
                         once = !once
                         Threading.sleep(seconds: 7)
@@ -123,9 +123,9 @@ class PerfectNetTests: XCTestCase {
 				client.close()
 			})
         } catch PerfectNetError.networkError(let code, let msg) {
-            XCTAssert(false, "Exception: \(code) \(msg)")
+            XCTFail("Exception: \(code) \(msg)")
         } catch let e {
-            XCTAssert(false, "Exception: \(e)")
+            XCTFail("Exception: \(e)")
         }
     }
     
@@ -164,17 +164,17 @@ class PerfectNetTests: XCTestCase {
 								let ptr = UnsafeRawPointer(readBytesCpy)
 								let s2 = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))!
 								let s = s1 + s2
-								XCTAssert(s.characters.starts(with: "HTTP/1.1 200 OK".characters))
+								XCTAssert(s.starts(with: "HTTP/1.1 200 OK"))
 								clientExpectation.fulfill()
 							}
 						}
                     }
                 } else {
-                    XCTAssert(false, "Did not get NetTCPSSL back after connect")
+                    XCTFail("Did not get NetTCPSSL back after connect")
                 }
             }
         } catch {
-            XCTAssert(false, "Exception thrown")
+            XCTFail("Exception thrown")
         }
 		self.waitForExpectations(timeout: 10000) {
 			_ in
@@ -239,7 +239,7 @@ class PerfectNetTests: XCTestCase {
 							f in
 							do {
 								guard let (bytes, _) = try f() else {
-									XCTAssert(false, "Nil response \(counter)")
+									XCTFail("Nil response \(counter)")
 									return serverExpectation.fulfill()
 								}
 								XCTAssert(bytes.count == counter+1)
@@ -248,7 +248,7 @@ class PerfectNetTests: XCTestCase {
 									loop(counter: counter+1)
 								}
 							} catch {
-								XCTAssert(false, "\(error)")
+								XCTFail("\(error)")
 								return serverExpectation.fulfill()
 							}
 						}
@@ -258,7 +258,7 @@ class PerfectNetTests: XCTestCase {
 				Threading.sleep(seconds: 1.0)
 				Threading.dispatch {
 					guard let address = NetAddress(host: "127.0.0.1", port: listenPort, type: .udp) else {
-						XCTAssert(false, "Could not make address")
+						XCTFail("Could not make address")
 						return clientExpectation.fulfill()
 					}
 					func loop(counter: Int) {
@@ -276,7 +276,7 @@ class PerfectNetTests: XCTestCase {
 									loop(counter: counter+1)
 								}
 							} catch {
-								XCTAssert(false, "\(error)")
+								XCTFail("\(error)")
 								return clientExpectation.fulfill()
 							}
 						}
@@ -284,7 +284,7 @@ class PerfectNetTests: XCTestCase {
 					loop(counter: 0)
 				}
 			} catch {
-				XCTAssert(false, "\(error)")
+				XCTFail("\(error)")
 				clientExpectation.fulfill()
 				serverExpectation.fulfill()
 			}
