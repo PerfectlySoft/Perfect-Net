@@ -45,7 +45,7 @@ public class NetTCP: Net {
 	
 	@available(*, deprecated, message: "Call bind() or connect() to init socket")
 	public func initSocket() {
-		self.initSocket(family: AF_INET)
+		initSocket(family: AF_INET)
 	}
 	
 	public override func initSocket(family: Int32) {
@@ -98,18 +98,18 @@ public class NetTCP: Net {
 	
 	func recv(into buf: UnsafeMutableRawPointer, count: Int) -> Int {
 	#if os(Linux)
-		return SwiftGlibc.recv(self.fd.fd, buf, count, 0)
+		return SwiftGlibc.recv(fd.fd, buf, count, 0)
 	#else
-		return Darwin.recv(self.fd.fd, buf, count, 0)
+		return Darwin.recv(fd.fd, buf, count, 0)
 	#endif
 	}
 	
 	func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
 		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
 	#if os(Linux)
-		return SwiftGlibc.send(self.fd.fd, ptr, count, 0)
+		return SwiftGlibc.send(fd.fd, ptr, count, 0)
 	#else
-		return Darwin.send(self.fd.fd, ptr, count, 0)
+		return Darwin.send(fd.fd, ptr, count, 0)
 	#endif
 	}
 	
@@ -122,33 +122,27 @@ public class NetTCP: Net {
 		let readCount = recv(into: buffer[read], count: remaining)
 		if readCount == 0 {
 			completion(nil) // disconnect
-		} else if self.isEAgain(err: readCount) {
-			
+		} else if isEAgain(err: readCount) {
 			// no data available. wait
-			self.readBytesFullyIncomplete(into: buffer, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
-			
+			readBytesFullyIncomplete(into: buffer, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
 		} else if readCount < 0 {
 			completion(nil) // networking or other error
-		} else {
-			
-			// got some data
-			if remaining - readCount == 0 { // done
-				completion(completeArray(from: buffer, count: read + readCount))
-			} else { // try again for more
-				readBytesFully(into: buffer, read: read + readCount, remaining: remaining - readCount, timeoutSeconds: timeoutSeconds, completion: completion)
-			}
+		} else if remaining - readCount == 0 { // done
+			completion(completeArray(from: buffer, count: read + readCount))
+		} else { // try again for more
+			readBytesFully(into: buffer, read: read + readCount, remaining: remaining - readCount, timeoutSeconds: timeoutSeconds, completion: completion)
 		}
 	}
 	
 	func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
-		
 		NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeoutSeconds) { [weak self]
 			fd, w in
-			
 			if case .read = w {
 				self?.readBytesFully(into: to, read: read, remaining: remaining, timeoutSeconds: timeoutSeconds, completion: completion)
+			} else if case .timer = w {
+				completion([]) // timeout
 			} else {
-				completion(nil) // timeout or error
+				completion(nil) // error
 			}
 		}
 	}
@@ -156,25 +150,26 @@ public class NetTCP: Net {
 	/// Read the indicated number of bytes and deliver them on the provided callback.
 	/// - parameter count: The number of bytes to read
 	/// - parameter timeoutSeconds: The number of seconds to wait for the requested number of bytes. A timeout value of negative one indicates that the request should have no timeout.
-	/// - parameter completion: The callback on which the results will be delivered. If the timeout occurs before the requested number of bytes have been read, a nil object will be delivered to the callback.
+	/// - parameter completion: The callback on which the results will be delivered.
+	///		If the timeout occurs before the requested number of bytes have been read, an empty array will be delivered to the callback.
+	///		If an error or disconnection occurs then a nil object will be delivered to the callback.
 	public func readBytesFully(count cnt: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
-
 		let ptr = ReferenceBuffer(size: cnt)
 		readBytesFully(into: ptr, read: 0, remaining: cnt, timeoutSeconds: timeoutSeconds, completion: completion)
 	}
 	
 	/// Read up to the indicated number of bytes and deliver them on the provided callback.
 	/// - parameter count: The maximum number of bytes to read.
-	/// - parameter completion: The callback on which to deliver the results. If an error occurs during the read then a nil object will be passed to the callback, otherwise, the immediately available number of bytes, which may be zero, will be passed.
+	/// - parameter completion: The callback on which to deliver the results.
+	///		If an error occurs during the read then a nil object will be passed to the callback, otherwise, the immediately available number of bytes, which may be zero, will be passed.
 	public func readSomeBytes(count cnt: Int, completion: @escaping ([UInt8]?) -> ()) {
-		
-		let readRead = min(cnt, self.reasonableMaxReadCount)
+		let readRead = min(cnt, reasonableMaxReadCount)
 		let ptr = ReferenceBuffer(size: readRead)
 		let readCount = recv(into: ptr[0], count: readRead)
 		if readCount == 0 {
 			completion(nil)
-		} else if self.isEAgain(err: readCount) {
-			completion([UInt8]())
+		} else if isEAgain(err: readCount) {
+			completion([])
 		} else if readCount == -1 {
 			completion(nil)
 		} else {
@@ -204,7 +199,6 @@ public class NetTCP: Net {
 		var totalSent = 0
 		var s: Threading.Event?
 		var what: NetEvent.Filter = .none
-		
 		let waitFunc = {
 			NetEvent.add(socket: self.fd.fd, what: .write, timeoutSeconds: NetEvent.noTimeout) {
 				_, w in
@@ -214,18 +208,14 @@ public class NetTCP: Net {
 				let _ = s?.unlock()
 			}
 		}
-		
 		while length > 0 {
-			
 			let sent = send(byts, offsetBy: totalSent, count: length - totalSent)
 			if sent == length {
 				return true
 			}
-			
 			if s == nil {
 				s = Threading.Event()
 			}
-			
 			if sent == -1 {
 				if isEAgain(err: sent) { // flow
 					let _ = s!.lock()
@@ -242,7 +232,6 @@ public class NetTCP: Net {
 				let _ = s!.lock()
 				waitFunc()
 			}
-			
 			let _ = s!.wait()
 			let _ = s!.unlock()
 			if case .write = what {
@@ -329,10 +318,10 @@ public class NetTCP: Net {
 		let accRes = Darwin.accept(fd.fd, nil, nil)
 	#endif
 		if accRes != -1 {
-			let newTcp = self.makeFromFd(accRes)
+			let newTcp = makeFromFd(accRes)
 			return callBack(newTcp)
 		}
-        guard self.isEAgain(err: Int(accRes)) else {
+        guard isEAgain(err: Int(accRes)) else {
             try ThrowNetworkError()
         }
         NetEvent.add(socket: fd.fd, what: .read, timeoutSeconds: timeout) {
@@ -360,7 +349,7 @@ public class NetTCP: Net {
 	/// Accept a series of new client connections and pass them to the callback. This function does not return outside of a catastrophic error.
 	/// - parameter callBack: The closure which will be called when the accept completes. the parameter will be a newly allocated instance of NetTCP which represents the client.
 	public func forEachAccept(callBack: @escaping (NetTCP?) -> ()) {
-		self.fd.switchToBlocking()
+		fd.switchToBlocking()
 		repeat {
 			let accRes = tryAccept()
 			if accRes != -1 {
@@ -372,7 +361,7 @@ public class NetTCP: Net {
 				print("Unexpected networking error: \(errno) '\(errStr)'")
 				networkFailure = true
 			}
-		} while !networkFailure && self.fd.fd != invalidSocket
+		} while !networkFailure && fd.fd != invalidSocket
 	}
 	
 	func makeFromFd(_ fd: Int32) -> NetTCP {
