@@ -105,11 +105,11 @@ public class NetEvent {
 	private var numEvents = 64
 	private var evlist: UnsafeMutablePointer<event>
 
-    private static var initOnce: Bool = {
-        NetEvent.staticEvent = NetEvent()
-        NetEvent.staticEvent.runLoop()
-        return true
-    }()
+	private static var initOnce: Bool = {
+		NetEvent.staticEvent = NetEvent()
+		NetEvent.staticEvent.runLoop()
+		return true
+	}()
 
 	public static let noTimeout = Threading.noTimeout
 
@@ -118,32 +118,32 @@ public class NetEvent {
 		var sa = sigaction()
 
 	#if os(Linux)
-		self.kq = epoll_create(0xFEC7)
+		kq = epoll_create(0xFEC7)
 		sa.__sigaction_handler.sa_handler = SIG_IGN
 	#else
-		self.kq = kqueue()
+		kq = kqueue()
 		sa.__sigaction_u.__sa_handler = SIG_IGN
 	#endif
 
 		sa.sa_flags = 0
 		sigaction(SIGPIPE, &sa, nil)
 
-        var rlmt = rlimit()
-    #if os(Linux)
-        getrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
-        rlmt.rlim_cur = rlmt.rlim_max
-        setrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
-    #else
-        getrlimit(RLIMIT_NOFILE, &rlmt)
-        rlmt.rlim_cur = rlim_t(OPEN_MAX)
-        setrlimit(RLIMIT_NOFILE, &rlmt)
-    #endif
+		var rlmt = rlimit()
+	#if os(Linux)
+		getrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
+		rlmt.rlim_cur = rlmt.rlim_max
+		setrlimit(Int32(RLIMIT_NOFILE.rawValue), &rlmt)
+	#else
+		getrlimit(RLIMIT_NOFILE, &rlmt)
+		rlmt.rlim_cur = rlim_t(OPEN_MAX)
+		setrlimit(RLIMIT_NOFILE, &rlmt)
+	#endif
 
-		guard self.kq != -1 else {
+		guard kq != -1 else {
 			logTerminal(message: "Unable to initialize event listener.")
 		}
-		self.evlist = UnsafeMutablePointer<event>.allocate(capacity: self.numEvents)
-		memset(self.evlist, 0, MemoryLayout<event>.size * self.numEvents)
+		evlist = UnsafeMutablePointer<event>.allocate(capacity: numEvents)
+		memset(evlist, 0, MemoryLayout<event>.size * numEvents)
 	}
 
 	public static func initialize() {
@@ -156,11 +156,11 @@ public class NetEvent {
 		q.dispatch {
 			while true {
 
-				#if os(Linux)
-					var nev = Int(epoll_wait(self.kq, self.evlist, Int32(self.numEvents), -1))
-				#else
-					var nev = Int(kevent(self.kq, nil, 0, self.evlist, Int32(self.numEvents), nil))
-				#endif
+			#if os(Linux)
+				var nev = Int(epoll_wait(self.kq, self.evlist, Int32(self.numEvents), -1))
+			#else
+				var nev = Int(kevent(self.kq, nil, 0, self.evlist, Int32(self.numEvents), nil))
+			#endif
 				
 				if nev == -1 {
 					if errno == EINTR {
@@ -172,8 +172,10 @@ public class NetEvent {
 
 				// process results
 				do {
-                    let _ = self.lock.lock()
-                    defer { let _ = self.lock.unlock() }
+                    _ = self.lock.lock()
+                    defer {
+						_ = self.lock.unlock()
+					}
 
 					if NetEvent.debug {
 						print("event wait returned \(nev)")
@@ -289,8 +291,10 @@ public class NetEvent {
 		}
 
 		if let n = NetEvent.staticEvent {
-			let _ = n.lock.lock()
-            defer { let _ = n.lock.unlock() }
+			_ = n.lock.lock()
+            defer {
+				_ = n.lock.unlock()
+			}
 
         #if os(Linux)
             var associated = invalidSocket
@@ -325,7 +329,6 @@ public class NetEvent {
             if NetEvent.debug {
                 print("event add \(newSocket) \(what) \(what.epollEvent)")
             }
-            //				print("event add \(socket) \(evt.events)")
         #else
             n.queuedSockets[newSocket] = QueuedSocket(socket: newSocket, what: what, timeoutSeconds: timeoutSeconds, callback: threadingCallback, associated: invalidSocket)
             var tmout = timespec(tv_sec: 0, tv_nsec: 0)
@@ -347,8 +350,10 @@ public class NetEvent {
 
 	public static func remove(socket oldSocket: SocketType) {
 		if let n = NetEvent.staticEvent {
-			let _ = n.lock.lock()
-            defer { let _ = n.lock.unlock() }
+			_ = n.lock.lock()
+            defer {
+				_ = n.lock.unlock()
+			}
 
             if let old = n.queuedSockets[oldSocket] {
 
