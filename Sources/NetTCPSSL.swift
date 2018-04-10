@@ -776,7 +776,7 @@ extension NetTCPSSL {
 			return
 		}
 		typealias sniCallback = @convention(c) (UnsafeMutablePointer<SSL>?, UnsafeMutablePointer<Int32>?, UnsafeMutableRawPointer?) -> Int32
-		typealias ctxCallback = (@convention(c) () -> Swift.Void)!
+		typealias ctxCallback = (@convention(c) () -> Swift.Void)
 		let callback: sniCallback = {
 			(ssl: UnsafeMutablePointer<SSL>?,
 			doNotKnow: UnsafeMutablePointer<Int32>?,
