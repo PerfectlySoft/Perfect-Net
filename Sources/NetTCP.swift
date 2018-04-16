@@ -353,7 +353,7 @@ public class NetTCP: Net {
 		repeat {
 			let accRes = tryAccept()
 			if accRes != -1 {
-				Threading.dispatch {
+				netHandleQueue.async {
 					callBack(self.makeFromFd(accRes))
 				}
 			} else if errno != EINTR {
