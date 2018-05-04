@@ -18,6 +18,7 @@
 //
 
 import PerfectThread
+import Foundation
 
 #if os(Linux)
 import SwiftGlibc
