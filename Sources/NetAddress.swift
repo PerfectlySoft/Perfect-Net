@@ -46,7 +46,7 @@ public struct NetAddress {
 		let staticBufferSize = Int(INET6_ADDRSTRLEN)
 		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
 		defer {
-			buffer.deallocate(capacity: staticBufferSize)
+			buffer.deallocate()
 		}
 		let family = Int32(addr.ss_family)
 		switch family {

@@ -281,7 +281,7 @@ public class NetTCPSSL : NetTCP {
 		let maxLen = 1024
         let buf = UnsafeMutablePointer<Int8>.allocate(capacity: maxLen)
 		defer {
-			buf.deallocate(capacity: maxLen)
+			buf.deallocate()
 		}
 		ERR_error_string_n(UInt(errorCode), buf, maxLen)
 		let ret = String(validatingUTF8: buf) ?? ""
