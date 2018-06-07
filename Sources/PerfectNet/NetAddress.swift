@@ -10,7 +10,7 @@ import PerfectThread
 
 #if os(Linux)
 	import SwiftGlibc
-	let AF_UNSPEC: Int32 = 0
+	public let AF_UNSPEC: Int32 = 0
 #else
 	import Darwin
 #endif
