@@ -1,3 +1,4 @@
+// swift-tools-version:4.1
 //
 //  Package.swift
 //  PerfectNet
@@ -22,22 +23,32 @@ import PackageDescription
 #if os(Linux)
 let package = Package(
     name: "PerfectNet",
-    targets: [],
-    dependencies: [
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 3),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-LinuxBridge.git", majorVersion: 3),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 3)
+    products: [
+        .library(name: "PerfectNet", targets: ["PerfectNet"])
     ],
-    exclude: []
+    dependencies: [
+        .package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", from: "3.0.0"),
+        .package(url: "https://github.com/PerfectlySoft/Perfect-LinuxBridge.git", from: "3.0.0"),
+        .package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", from: "3.0.0")
+    ],
+    targets: [
+        .target(name: "PerfectNet", dependencies: ["PerfectCrypto", "LinuxBridge", "PerfectThread"]),
+        .testTarget(name: "PerfectNetTests", dependencies: ["PerfectNet", "PerfectCrypto", "PerfectThread"])
+    ]
 )
 #else
 let package = Package(
     name: "PerfectNet",
-    targets: [],
-    dependencies: [
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", majorVersion: 3),
-        .Package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", majorVersion: 3)
+    products: [
+        .library(name: "PerfectNet", targets: ["PerfectNet"])
     ],
-    exclude: []
+    dependencies: [
+        .package(url: "https://github.com/PerfectlySoft/Perfect-Crypto.git", from: "3.0.0"),
+        .package(url: "https://github.com/PerfectlySoft/Perfect-Thread.git", from: "3.0.0")
+    ],
+    targets: [
+        .target(name: "PerfectNet", dependencies: ["PerfectCrypto", "PerfectThread"]),
+        .testTarget(name: "PerfectNetTests", dependencies: ["PerfectNet", "PerfectCrypto", "PerfectThread"])
+    ]
 )
 #endif
