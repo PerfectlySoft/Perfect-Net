@@ -10,7 +10,7 @@ import PerfectThread
 
 #if os(Linux)
 	import SwiftGlibc
-	let AF_UNSPEC: Int32 = 0
+	public let AF_UNSPEC: Int32 = 0
 #else
 	import Darwin
 #endif
@@ -46,7 +46,7 @@ public struct NetAddress {
 		let staticBufferSize = Int(INET6_ADDRSTRLEN)
 		let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: staticBufferSize)
 		defer {
-			buffer.deallocate(capacity: staticBufferSize)
+			buffer.deallocate()
 		}
 		let family = Int32(addr.ss_family)
 		switch family {

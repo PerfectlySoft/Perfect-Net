@@ -41,8 +41,8 @@ public class NetNamedPipe : NetTCP {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
 		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
 		defer {
-			addr.deallocate(capacity: 1)
-			len.deallocate(capacity: 1)
+			addr.deallocate()
+			len.deallocate()
 		}
 		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
 		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -70,8 +70,8 @@ public class NetNamedPipe : NetTCP {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
 		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
 		defer {
-			addr.deallocate(capacity: 1)
-			len.deallocate(capacity: 1)
+			addr.deallocate()
+			len.deallocate()
 		}
 		len.pointee = socklen_t(MemoryLayout<sockaddr_in>.size)
 		_ = addr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -136,7 +136,9 @@ public class NetNamedPipe : NetTCP {
 		initSocket(family: AF_UNIX)
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
-		defer { addrPtr.deallocate(capacity: addrLen) }
+		defer {
+            addrPtr.deallocate()
+        }
 		
 		let bRes = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
 			(p:UnsafeMutablePointer<sockaddr>) -> Int32 in
@@ -162,7 +164,9 @@ public class NetNamedPipe : NetTCP {
 		initSocket(family: AF_UNIX)
 
 		let (addrPtr, addrLen) = self.makeUNAddr(address: addr)
-		defer { addrPtr.deallocate(capacity: addrLen) }
+		defer {
+            addrPtr.deallocate()
+        }
 
 		let cRes = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
 			(p:UnsafeMutablePointer<sockaddr>) -> Int32 in
@@ -204,12 +208,12 @@ public class NetNamedPipe : NetTCP {
 	#endif
 		var nothingPtr = UnsafeMutablePointer<iovec>.allocate(capacity: 1)
 		var nothing = UnsafeMutablePointer<CChar>.allocate(capacity: 1)
-		let buffer = UnsafeMutableRawPointer.allocate(bytes: length, alignedTo: 8)
+		let buffer = UnsafeMutableRawPointer.allocate(byteCount: length, alignment: 8)
 		defer {
-			msghdr.deallocate(capacity: 1)
-			buffer.deallocate(bytes: length, alignedTo: 8)
-			nothingPtr.deallocate(capacity: 1)
-			nothing.deallocate(capacity: 1)
+			msghdr.deallocate()
+			buffer.deallocate()
+			nothingPtr.deallocate()
+			nothing.deallocate()
 		}
 
 		var cmsg = buffer.assumingMemoryBound(to: cmsghdr.self)
@@ -268,11 +272,11 @@ public class NetNamedPipe : NetTCP {
 		var msghdrr = msghdr()
 		var nothingPtr = UnsafeMutablePointer<iovec>.allocate(capacity: 1)
 		var nothing = UnsafeMutablePointer<CChar>.allocate(capacity: 1)
-		let buffer = UnsafeMutableRawPointer.allocate(bytes: length, alignedTo: 8)
+		let buffer = UnsafeMutableRawPointer.allocate(byteCount: length, alignment: 8)
 		defer {
-			buffer.deallocate(bytes: length, alignedTo: 8)
-			nothingPtr.deallocate(capacity: 1)
-			nothing.deallocate(capacity: 1)
+			buffer.deallocate()
+			nothingPtr.deallocate()
+			nothing.deallocate()
 		}
 
 		nothing.pointee = 33
