@@ -134,7 +134,7 @@ public struct SocketFileDescriptor {
 	#endif
         var one = Int32(1)
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, UInt32(MemoryLayout<Int32>.size))
-	#if os(OSX)
+	#if os(OSX) || os(iOS) || os(tvOS)
 		setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, UInt32(MemoryLayout<Int32>.size));
 	#endif
 	}
