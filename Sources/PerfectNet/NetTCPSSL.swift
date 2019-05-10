@@ -114,13 +114,13 @@ public class NetTCPSSL : NetTCP {
 		guard PerfectCrypto.isInitialized else {
 			return false
 		}
-        SSL_library_init()
-        ERR_load_crypto_strings()
-        SSL_load_error_strings()
+        copenssl_SSL_library_init()
+        copenssl_ERR_load_crypto_strings()
+        copenssl_SSL_load_error_strings()
 		sslCtxALPNBufferIndex = SSL_CTX_get_ex_new_index(0, nil, nil, nil, {
 			(p1:UnsafeMutableRawPointer?, p2:UnsafeMutableRawPointer?, d:UnsafeMutablePointer<CRYPTO_EX_DATA>?, i1:Int32, i2:Int, p3:UnsafeMutableRawPointer?) in
 			if let p2 = p2 {
-				CRYPTO_free(p2)
+				OPENSSL_free(p2)
 			}
 		})
 		sslCtxALPNBufferSizeIndex = SSL_CTX_get_ex_new_index(0, nil, nil, nil, nil)
@@ -226,19 +226,7 @@ public class NetTCPSSL : NetTCP {
 		guard let sslCtx = newSslCtx else {
 			return nil
 		}
-		#if os(Linux)
-			if openssl_compat_have_ecdh_auto == 1 {
-				SSL_CTX_ctrl(sslCtx, SSL_CTRL_SET_ECDH_AUTO, 1, nil)
-			}
-		#else
-			SSL_CTX_ctrl(sslCtx, SSL_CTRL_SET_ECDH_AUTO, 1, nil)
-		#endif
-		SSL_CTX_ctrl(sslCtx, SSL_CTRL_MODE, SSL_MODE_AUTO_RETRY, nil)
-        #if arch(arm)
-            SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, Int(bitPattern: SSL_OP_ALL), nil)
-        #else
-            SSL_CTX_ctrl(sslCtx, SSL_CTRL_OPTIONS, SSL_OP_ALL, nil)
-        #endif
+		copenssl_SSL_CTX_set_options(sslCtx)
 		return sslCtx
 	}
 	
@@ -658,9 +646,11 @@ extension NetTCPSSL {
 		SSL_CTX_set_client_CA_list(sslCtx, SSL_load_client_CA_file(path))
 		let newList = SSL_CTX_get_client_CA_list(sslCtx)
 
-		if
-			let oldNbCAs = oldList?.pointee.stack.num,
-			let newNbCAs = newList?.pointee.stack.num, oldNbCAs + 1 == newNbCAs {
+		if let oldNb = oldList,
+			let newNb = newList,
+			copenssl_stack_st_X509_NAME_num(oldNb)
+				+ 1 ==
+			copenssl_stack_st_X509_NAME_num(newNb) {
 
 			SSL_CTX_set_verify(sslCtx, verifyMode.rawValue, nil)
 			return true
@@ -713,7 +703,7 @@ extension NetTCPSSL {
 		guard let ctx = getCtx(forHost: forHost)?.sslCtx, !buffer.isEmpty else {
 			return
 		}
-		if let ptr = CRYPTO_malloc(Int32(buffer.count), #file, #line) {
+		if let ptr = copenssl_CRYPTO_malloc(buffer.count, #file, #line) {
 			memcpy(ptr, buffer, buffer.count)
 			SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferIndex, ptr)
 			SSL_CTX_set_ex_data(ctx, NetTCPSSL.sslCtxALPNBufferSizeIndex, UnsafeMutableRawPointer(bitPattern: buffer.count))
