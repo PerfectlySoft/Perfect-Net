@@ -115,12 +115,10 @@ public class NetTCPSSL : NetTCP {
 			return false
 		}
         copenssl_SSL_library_init()
-        copenssl_ERR_load_crypto_strings()
-        copenssl_SSL_load_error_strings()
 		sslCtxALPNBufferIndex = SSL_CTX_get_ex_new_index(0, nil, nil, nil, {
 			(p1:UnsafeMutableRawPointer?, p2:UnsafeMutableRawPointer?, d:UnsafeMutablePointer<CRYPTO_EX_DATA>?, i1:Int32, i2:Int, p3:UnsafeMutableRawPointer?) in
 			if let p2 = p2 {
-				CRYPTO_free(p2)
+				CRYPTO_free(p2, #file, #line)
 			}
 		})
 		sslCtxALPNBufferSizeIndex = SSL_CTX_get_ex_new_index(0, nil, nil, nil, nil)
