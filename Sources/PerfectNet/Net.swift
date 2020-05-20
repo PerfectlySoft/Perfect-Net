@@ -98,9 +98,11 @@ final class ReferenceBuffer {
 		self.size = size
 		self.a = [UInt8](repeating: 0, count: size)
 	}
-	
-	subscript(by: Int) -> UnsafeMutableRawPointer {
-		return UnsafeMutableRawPointer(mutating: UnsafeRawPointer(self.a).advanced(by: by))
+	func withUnsafeMutableBytes<R>(advanced by: Int, _ body: (UnsafeMutableRawPointer?) -> R) -> R {
+		return a.withUnsafeMutableBytes {
+			(p: UnsafeMutableRawBufferPointer) -> R in
+			return body(p.baseAddress?.advanced(by: by))
+		}
 	}
 }
 
@@ -202,48 +204,48 @@ open class Net {
 			fd.switchToNonBlocking()
 		}
 	}
-	
-	func makeAddress(_ sin: inout sockaddr_storage, host: String, port: UInt16) -> Int {
-		let aiFlags: Int32 = 0
-		let family: Int32 = AF_UNSPEC
-		let bPort = port.bigEndian
-		var hints = addrinfo(ai_flags: aiFlags, ai_family: family, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
-		var resultList = UnsafeMutablePointer<addrinfo>(bitPattern: 0)
-		var result = getaddrinfo(host, nil, &hints, &resultList)
-		while EAI_AGAIN == result {
-			Threading.sleep(seconds: 0.1)
-			result = getaddrinfo(host, nil, &hints, &resultList)
-		}
-		if result == EAI_NONAME {
-			hints = addrinfo(ai_flags: aiFlags, ai_family: AF_INET6, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
-			result = getaddrinfo(host, nil, &hints, &resultList)
-		}
-		if result == 0, var resultList = resultList {
-			defer {
-				freeaddrinfo(resultList)
-			}
-			guard let addr = resultList.pointee.ai_addr else {
-				return -1
-			}
-			switch Int32(addr.pointee.sa_family) {
-			case AF_INET6:
-				memcpy(&sin, addr, MemoryLayout<sockaddr_in6>.size)
-				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
-					$0.pointee.sin6_port = in_port_t(bPort)
-				}
-			case AF_INET:
-				memcpy(&sin, addr, MemoryLayout<sockaddr_in>.size)
-				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
-					$0.pointee.sin_port = in_port_t(bPort)
-				}
-			default:
-				return -1
-			}
-		} else {
-			return -1
-		}
-		return 0
-	}
+//
+//	func makeAddress(_ sin: inout sockaddr_storage, host: String, port: UInt16) -> Int {
+//		let aiFlags: Int32 = 0
+//		let family: Int32 = AF_UNSPEC
+//		let bPort = port.bigEndian
+//		var hints = addrinfo(ai_flags: aiFlags, ai_family: family, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+//		var resultList = UnsafeMutablePointer<addrinfo>(bitPattern: 0)
+//		var result = getaddrinfo(host, nil, &hints, &resultList)
+//		while EAI_AGAIN == result {
+//			Threading.sleep(seconds: 0.1)
+//			result = getaddrinfo(host, nil, &hints, &resultList)
+//		}
+//		if result == EAI_NONAME {
+//			hints = addrinfo(ai_flags: aiFlags, ai_family: AF_INET6, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+//			result = getaddrinfo(host, nil, &hints, &resultList)
+//		}
+//		if result == 0, var resultList = resultList {
+//			defer {
+//				freeaddrinfo(resultList)
+//			}
+//			guard let addr = resultList.pointee.ai_addr else {
+//				return -1
+//			}
+//			switch Int32(addr.pointee.sa_family) {
+//			case AF_INET6:
+//				memcpy(&sin, addr, MemoryLayout<sockaddr_in6>.size)
+//				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+//					$0.pointee.sin6_port = in_port_t(bPort)
+//				}
+//			case AF_INET:
+//				memcpy(&sin, addr, MemoryLayout<sockaddr_in>.size)
+//				UnsafeMutablePointer(&sin).withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+//					$0.pointee.sin_port = in_port_t(bPort)
+//				}
+//			default:
+//				return -1
+//			}
+//		} else {
+//			return -1
+//		}
+//		return 0
+//	}
 	
 	
 	func isEAgain(err: Int) -> Bool {
@@ -255,18 +257,17 @@ open class Net {
 	/// - parameter address: The the local address, given as a string, on which to bind. Defaults to "0.0.0.0".
 	/// - throws: PerfectError.NetworkError
 	public func bind(port prt: UInt16, address: String = "0.0.0.0") throws {
-		var addr = sockaddr_storage()
-		let res = makeAddress(&addr, host: address, port: prt)
-		guard res != -1 else {
+		guard var addr = NetAddress(host: address, port: prt)?.addr else {
 			try ThrowNetworkError()
 		}
 		initSocket(family: Int32(addr.ss_family))
-		let bRes: Int32 = UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			saddr in
+		let len = socklen_t(addr.ss_len)
+		let bRes: Int32 = withUnsafeBytes(of: &addr) {
+			let saddr = $0.bindMemory(to: sockaddr.self).baseAddress
 			#if os(Linux)
-				return SwiftGlibc.bind(self.fd.fd, saddr, socklen_t(addr.ss_len))
+				return SwiftGlibc.bind(self.fd.fd, saddr, len)
 			#else
-				return Darwin.bind(self.fd.fd, saddr, socklen_t(addr.ss_len))
+				return Darwin.bind(self.fd.fd, saddr, len)
 			#endif
 		}
 		if bRes == -1 {

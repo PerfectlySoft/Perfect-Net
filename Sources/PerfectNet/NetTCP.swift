@@ -43,57 +43,36 @@ public class NetTCP: Net {
 		self.fd.switchToNonBlocking()
 	}
 	
-	@available(*, deprecated, message: "Call bind() or connect() to init socket")
-	public func initSocket() {
-		initSocket(family: AF_INET)
-	}
-	
 	public override func initSocket(family: Int32) {
 		initSocket(family: family, type: SOCK_STREAM)
 	}
 	
 	public var localAddress: NetAddress? {
-		var addr = sockaddr_storage()
-		let addrPtr = UnsafeMutablePointer(&addr)
+		var addr = Array<Int8>(repeating: 0, count: MemoryLayout<sockaddr_storage>.size)
 		var len = socklen_t(MemoryLayout<sockaddr_storage>.size)
-		let result: Int32 = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			p in
-			getsockname(fd.fd, p, &len)
+		return addr.withUnsafeMutableBytes {
+			guard 0 == getsockname(fd.fd, $0.bindMemory(to: sockaddr.self).baseAddress, &len) else {
+				return nil
+			}
+			guard let p = $0.bindMemory(to: sockaddr_storage.self).baseAddress else {
+				return nil
+			}
+			return NetAddress(addr: p.pointee)
 		}
-		guard result == 0 else {
-			return nil
-		}
-		return NetAddress(addr: addr)
 	}
 	
 	public var remoteAddress: NetAddress? {
-		var addr = sockaddr_storage()
-		let addrPtr = UnsafeMutablePointer(&addr)
+		var addr = Array<Int8>(repeating: 0, count: MemoryLayout<sockaddr_storage>.size)
 		var len = socklen_t(MemoryLayout<sockaddr_storage>.size)
-		let result: Int32 = addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			p in
-			getpeername(fd.fd, p, &len)
+		return addr.withUnsafeMutableBytes {
+			guard 0 == getpeername(fd.fd, $0.bindMemory(to: sockaddr.self).baseAddress, &len) else {
+				return nil
+			}
+			guard let p = $0.bindMemory(to: sockaddr_storage.self).baseAddress else {
+				return nil
+			}
+			return NetAddress(addr: p.pointee)
 		}
-		guard result == 0 else {
-			return nil
-		}
-		return NetAddress(addr: addr)
-	}
-	
-	@available(*, deprecated, message: "Use .localAddress")
-	public func sockName() -> (String, UInt16) {
-		guard let localAddress = self.localAddress else {
-			return ("", 0)
-		}
-		return (localAddress.host, localAddress.port)
-	}
-	
-	@available(*, deprecated, message: "Use .remoteAddress")
-	public func peerName() -> (String, UInt16) {
-		guard let remoteAddress = self.remoteAddress else {
-			return ("", 0)
-		}
-		return (remoteAddress.host, remoteAddress.port)
 	}
 	
 	func recv(into buf: UnsafeMutableRawPointer, count: Int) -> Int {
@@ -105,12 +84,15 @@ public class NetTCP: Net {
 	}
 	
 	func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
-		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
-	#if os(Linux)
-		return SwiftGlibc.send(fd.fd, ptr, count, 0)
-	#else
-		return Darwin.send(fd.fd, ptr, count, 0)
-	#endif
+		return buf.withUnsafeBytes {
+			(p: UnsafeRawBufferPointer) -> Int in
+			let ptr = p.baseAddress?.advanced(by: offsetBy)
+		#if os(Linux)
+			return SwiftGlibc.send(fd.fd, ptr, count, 0)
+		#else
+			return Darwin.send(fd.fd, ptr, count, 0)
+		#endif
+		}
 	}
 	
 	private final func completeArray(from frm: ReferenceBuffer, count: Int) -> [UInt8] {
@@ -119,7 +101,12 @@ public class NetTCP: Net {
 	}
 	
 	func readBytesFully(into buffer: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
-		let readCount = recv(into: buffer[read], count: remaining)
+		let readCount: Int = buffer.withUnsafeMutableBytes(advanced: read) {
+			guard let ptr = $0 else {
+				return 0
+			}
+			return recv(into: ptr, count: remaining)
+		}
 		if readCount == 0 {
 			completion(nil) // disconnect
 		} else if isEAgain(err: readCount) {
@@ -165,7 +152,12 @@ public class NetTCP: Net {
 	public func readSomeBytes(count cnt: Int, completion: @escaping ([UInt8]?) -> ()) {
 		let readRead = min(cnt, reasonableMaxReadCount)
 		let ptr = ReferenceBuffer(size: readRead)
-		let readCount = recv(into: ptr[0], count: readRead)
+		let readCount: Int = ptr.withUnsafeMutableBytes(advanced: 0) {
+			guard let ptr = $0 else {
+				return 0
+			}
+			return recv(into: ptr, count: readRead)
+		}
 		if readCount == 0 {
 			completion(nil)
 		} else if isEAgain(err: readCount) {
@@ -276,18 +268,17 @@ public class NetTCP: Net {
 	/// - parameter callBack: The closure which will be called when the connection completes. If the connection completes successfully then the current NetTCP instance will be passed to the callback, otherwise, a nil object will be passed.
 	/// - returns: `PerfectError.NetworkError`
 	public func connect(address addrs: String, port: UInt16, timeoutSeconds: Double, callBack: @escaping (NetTCP?) -> ()) throws {
-		var addr = sockaddr_storage()
-		let res = makeAddress(&addr, host: addrs, port: port)
-		guard res != -1 else {
+		guard var addr = NetAddress(host: addrs, port: port)?.addr else {
 			try ThrowNetworkError()
 		}
 		initSocket(family: Int32(addr.ss_family))
-		let cRes: Int32 = UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) {
-			saddr in
+		let len = socklen_t(addr.ss_len)
+		let cRes: Int32 = withUnsafeBytes(of: &addr) {
+			let saddr = $0.bindMemory(to: sockaddr.self).baseAddress
 		#if os(Linux)
-			return SwiftGlibc.connect(self.fd.fd, saddr, socklen_t(addr.ss_len))
+			return SwiftGlibc.connect(self.fd.fd, saddr, len)
 		#else
-			return Darwin.connect(self.fd.fd, saddr, socklen_t(addr.ss_len))
+			return Darwin.connect(self.fd.fd, saddr, len)
 		#endif
 		}
 		if cRes != -1 {

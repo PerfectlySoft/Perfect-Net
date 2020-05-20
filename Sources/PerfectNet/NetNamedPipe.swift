@@ -37,7 +37,7 @@ public class NetNamedPipe : NetTCP {
 		self.fd.switchToNonBlocking()
 	}
 
-	public override func sockName() -> (String, UInt16) {
+	public func sockName() -> (String, UInt16) {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
 		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
 		defer {
@@ -66,7 +66,7 @@ public class NetNamedPipe : NetTCP {
 		return (s, p)
 	}
 
-	public override func peerName() -> (String, UInt16) {
+	public func peerName() -> (String, UInt16) {
 		var addr = UnsafeMutablePointer<sockaddr_un>.allocate(capacity: 1)
 		var len = UnsafeMutablePointer<socklen_t>.allocate(capacity: 1)
 		defer {

@@ -305,12 +305,14 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	override func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
-		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
-		if self.usingSSL {
-			let i = Int(SSL_write(self.ssl!, ptr, Int32(count)))
-			return i
+		return buf.withUnsafeBytes {
+			let ptr = $0.baseAddress?.advanced(by: offsetBy)
+			if self.usingSSL {
+				let i = Int(SSL_write(self.ssl!, ptr, Int32(count)))
+				return i
+			}
+			return super.send(buf, offsetBy: offsetBy, count: count)
 		}
-		return super.send(buf, offsetBy: offsetBy, count: count)
 	}
 
 	override func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {

@@ -50,12 +50,14 @@ public class NetUDP: Net {
 	/// - parameter completion: The callback on which the results will be delivered. If the timeout occurs before the requested number of bytes have been read, a nil object will be delivered to the callback.
 	public func readBytes(count: Int, timeoutSeconds: Double, completion: @escaping (() throws -> ([UInt8], NetAddress)?) -> ()) {
 		var a = [UInt8](repeating: 0, count: count)
-		let ptr = UnsafeMutableRawPointer(mutating: a)
-		
 		var addr = sockaddr_storage()
-		let addrPtr = UnsafeMutableRawPointer(&addr)
 		var addrSize = socklen_t(MemoryLayout<sockaddr_storage>.size)
-		let size = recvfrom(fd.fd, ptr, count, 0, addrPtr.assumingMemoryBound(to: sockaddr.self), &addrSize)
+		let size = a.withUnsafeMutableBytes {
+			ptr in withUnsafeMutableBytes(of: &addr) {
+				addrPtr in
+				recvfrom(fd.fd, ptr.baseAddress, count, 0, addrPtr.bindMemory(to: sockaddr.self).baseAddress, &addrSize)
+			}
+		}
 		if size > 0, let addr = NetAddress(addr: addr) {
 			completion({ return (Array(a[0..<size]), addr) })
 		} else if size == 0 {
@@ -83,9 +85,15 @@ public class NetUDP: Net {
 	/// - parameter completion: The callback which will be called once the write has completed. The callback will be passed the number of bytes which were successfuly written, which may be zero.
 	public func write(bytes: [UInt8], to: NetAddress, timeoutSeconds: Double, completion: @escaping (() throws -> (Int, NetAddress)) -> ())  {
 		var addr = to.addr
-		let addrPtr = UnsafeMutableRawPointer(&addr)
 		let addrSize = socklen_t(addr.ss_len)
-		let sent = sendto(fd.fd, UnsafePointer(bytes), bytes.count, 0, addrPtr.assumingMemoryBound(to: sockaddr.self), addrSize)
+		let count = bytes.count
+		let sent = bytes.withUnsafeBytes {
+			ptr in
+			withUnsafeBytes(of: &addr) {
+				addrPtr in
+				sendto(fd.fd, ptr.baseAddress, count, 0, addrPtr.bindMemory(to: sockaddr.self).baseAddress, addrSize)
+			}
+		}
 		if sent == bytes.count {
 			completion({ return (sent, to) })
 		} else if isEAgain(err: sent) && timeoutSeconds > 0 {
