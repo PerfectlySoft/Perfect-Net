@@ -305,14 +305,12 @@ public class NetTCPSSL : NetTCP {
 	}
 
 	override func send(_ buf: [UInt8], offsetBy: Int, count: Int) -> Int {
-		return buf.withUnsafeBytes {
-			let ptr = $0.baseAddress?.advanced(by: offsetBy)
-			if self.usingSSL {
-				let i = Int(SSL_write(self.ssl!, ptr, Int32(count)))
-				return i
-			}
-			return super.send(buf, offsetBy: offsetBy, count: count)
+		let ptr = UnsafeRawPointer(buf).advanced(by: offsetBy)
+		if self.usingSSL {
+			let i = Int(SSL_write(self.ssl!, ptr, Int32(count)))
+			return i
 		}
+		return super.send(buf, offsetBy: offsetBy, count: count)
 	}
 
 	override func readBytesFullyIncomplete(into to: ReferenceBuffer, read: Int, remaining: Int, timeoutSeconds: Double, completion: @escaping ([UInt8]?) -> ()) {
@@ -597,13 +595,31 @@ extension NetTCPSSL {
 		guard let sslCtx = getCtx(forHost: forHost)?.sslCtx else {
 			return false
 		}
+
+		var crt_trim = crt.trimmingCharacters(in: .whitespacesAndNewlines)
 		let bio = BIO_new(BIO_s_mem())
 		defer {
 			BIO_free(bio)
 		}
-		BIO_puts(bio, crt)
-		let certificate = PEM_read_bio_X509(bio, nil, nil, nil)
+		BIO_puts(bio, crt_trim)
+		let certificate = PEM_read_bio_X509_AUX(bio, nil, nil, nil)
 		let r = SSL_CTX_use_certificate(sslCtx, certificate)
+
+		let chainList = crt_trim.components(separatedBy: "-----END CERTIFICATE-----")
+		for (idx, chain) in chainList.enumerated() {
+			if (idx == 0 || chain == "") {
+				continue
+			}
+			var tmp = chain.trimmingCharacters(in: .whitespacesAndNewlines)
+			tmp += "\n-----END CERTIFICATE-----"
+
+			let bio_chain = BIO_new(BIO_s_mem())
+			BIO_puts(bio_chain, tmp)
+			let cert_chain = PEM_read_bio_X509(bio_chain, nil, nil, nil)
+			SSL_CTX_use_certificate_add_chain(sslCtx, cert_chain, Int32(idx))
+			BIO_free(bio_chain)
+		}
+
 		return r == 1
 	}
 
